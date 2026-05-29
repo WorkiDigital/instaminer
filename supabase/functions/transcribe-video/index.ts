@@ -81,29 +81,39 @@ Deno.serve(async (req) => {
        return json({ error: "Post sem permalink no banco de dados." }, 400);
     }
 
+    // timeout=90s — Apify tem até 90 segundos para responder
     const apifyReq = await fetch(
-      `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
+      `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=90`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ directUrls: [post.permalink] }),
+        body: JSON.stringify({
+          directUrls: [post.permalink],
+          resultsType: "posts",
+          resultsLimit: 1,
+        }),
+        signal: AbortSignal.timeout(100_000), // 100s no fetch
       }
     );
 
     if (!apifyReq.ok) {
-      return json({ error: `Falha ao chamar Apify (${apifyReq.status})` }, 500);
+      const errText = await apifyReq.text().catch(() => "");
+      console.error("Apify HTTP error", apifyReq.status, errText);
+      return json({ error: `Apify retornou erro ${apifyReq.status}. ${errText.substring(0, 200)}` }, 500);
     }
 
     const apifyData = await apifyReq.json();
+    console.log("Apify response length:", apifyData?.length, "first item keys:", Object.keys(apifyData?.[0] || {}));
+
     if (!apifyData || apifyData.length === 0) {
-       return json({ error: "Apify não conseguiu extrair o vídeo. O perfil pode ser privado ou o vídeo foi apagado." }, 500);
+      return json({ error: "Apify não retornou dados. O post pode ser privado ou ter sido apagado." }, 500);
     }
 
     if (apifyData[0].error) {
-       return json({ error: "Erro do Apify: " + apifyData[0].errorDescription }, 500);
+      return json({ error: "Erro do Apify: " + (apifyData[0].errorDescription || apifyData[0].error) }, 500);
     }
 
-    const mediaUrl = apifyData[0].videoUrl;
+    const mediaUrl = apifyData[0].videoUrl || apifyData[0].video_url || apifyData[0].videoPlaybackQualityList?.[0]?.url;
 
     if (!mediaUrl) {
       return json({

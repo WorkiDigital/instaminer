@@ -36,16 +36,18 @@ function isBusinessDiscoveryError(
   return 'error' in data;
 }
 
-async function getFunctionErrorMessage(error: unknown) {
-  const defaultMessage = 'Erro ao minerar perfil no Instagram';
-  const maybeError = error as { message?: string; context?: Response };
+async function getFunctionErrorMessage(error: unknown): Promise<string> {
+  const defaultMessage = 'Erro ao chamar função';
+  const maybeError = error as { message?: string; context?: unknown };
 
-  if (maybeError.context) {
-    const body = await maybeError.context.clone().json().catch(() => null) as BusinessDiscoveryError | null;
-    if (body?.error) {
-      console.error('Business Discovery API error:', body);
-      return body.error;
+  try {
+    const ctx = maybeError.context;
+    if (ctx && typeof (ctx as Response).clone === 'function') {
+      const body = await (ctx as Response).clone().json().catch(() => null) as { error?: string } | null;
+      if (body?.error) return body.error;
     }
+  } catch {
+    // context não é um Response — ignora
   }
 
   return maybeError.message || defaultMessage;
