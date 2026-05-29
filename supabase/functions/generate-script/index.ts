@@ -39,13 +39,10 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) return json({ error: "Sessão inválida" }, 401);
 
-  // 1. Fetch content item, analysis, and brand tone
+  // 1. Fetch content item
   const { data: item, error: itemError } = await adminClient
     .from("content_items")
-    .select(`
-      *,
-      profiles(brand_tone)
-    `)
+    .select("*")
     .eq("id", content_item_id)
     .single();
 
@@ -53,19 +50,19 @@ Deno.serve(async (req) => {
     return json({ error: "Card de conteúdo não encontrado" }, 404);
   }
 
-  // 1.5 Fetch target audience
-  const { data: audience, error: audError } = await adminClient
-    .from("target_audiences")
-    .select("*")
-    .eq("id", target_audience_id)
-    .single();
+  // 1.5 Fetch brand tone e público-alvo em paralelo
+  const [profileResult, audienceResult] = await Promise.all([
+    adminClient.from("profiles").select("brand_tone").eq("id", userData.user.id).maybeSingle(),
+    adminClient.from("target_audiences").select("*").eq("id", target_audience_id).single(),
+  ]);
 
-  if (audError || !audience) {
+  const audience = audienceResult.data;
+  if (audienceResult.error || !audience) {
     return json({ error: "Público-Alvo selecionado não encontrado no banco de dados." }, 400);
   }
 
   const analysis = item.source_analysis || {};
-  const profile = item.profiles;
+  const profile = profileResult.data;
 
   // 2. Montar o super-prompt
   const promptText = `
