@@ -87,6 +87,36 @@ export function MinePage() {
     await loadProfilePosts(profile.id);
   };
 
+  const ProfileAvatar = ({ url, username, size }: { url: string | null; username: string; size: number }) => {
+    const fontSize = size <= 40 ? 14 : 22;
+    const fallback = (
+      <div style={{
+        width: size, height: size, borderRadius: '50%',
+        background: 'var(--gradient-primary)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontSize, fontWeight: 700, flexShrink: 0,
+      }}>
+        {username[0].toUpperCase()}
+      </div>
+    );
+    if (!url) return fallback;
+    return (
+      <img
+        src={url}
+        alt={username}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        onError={e => {
+          const img = e.currentTarget;
+          img.style.display = 'none';
+          const div = document.createElement('div');
+          div.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:${fontSize}px;font-weight:700;flex-shrink:0`;
+          div.textContent = username[0].toUpperCase();
+          img.parentElement?.insertBefore(div, img);
+        }}
+      />
+    );
+  };
+
   const getPerformanceBadge = (ratio: number | null) => {
     if (!ratio) return null;
     if (ratio >= 2) return { label: '🔥 Viral', className: 'badge-error' };
@@ -183,14 +213,7 @@ export function MinePage() {
                     textAlign: 'left',
                   }}
                 >
-                  <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: 'var(--gradient-primary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontSize: 14, fontWeight: 700, flexShrink: 0,
-                  }}>
-                    {profile.ig_username[0].toUpperCase()}
-                  </div>
+                  <ProfileAvatar url={profile.profile_picture_url} username={profile.ig_username} size={36} />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div className="truncate" style={{ fontSize: 13, fontWeight: 600 }}>
                       @{profile.ig_username}
@@ -213,14 +236,7 @@ export function MinePage() {
               {/* Profile header */}
               <div className="card" style={{ marginBottom: 16 }}>
                 <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{
-                    width: 56, height: 56, borderRadius: '50%',
-                    background: 'var(--gradient-primary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontSize: 22, fontWeight: 700,
-                  }}>
-                    {selectedProfile.ig_username[0].toUpperCase()}
-                  </div>
+                  <ProfileAvatar url={selectedProfile.profile_picture_url} username={selectedProfile.ig_username} size={56} />
                   <div style={{ flex: 1 }}>
                     <h2 style={{ fontSize: 18 }}>@{selectedProfile.ig_username}</h2>
                     <div style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 13, color: 'var(--text-secondary)' }}>
