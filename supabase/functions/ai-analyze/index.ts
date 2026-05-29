@@ -96,6 +96,11 @@ Deno.serve(async (req) => {
   const promptText = `${contextLine}${captionSection}
 
 Você é um estrategista de conteúdo. Analise este post e extraia os padrões estruturais.
+
+**REGRA IMPORTANTE PARA "headline":**
+Se a imagem de capa tiver texto sobreposto visível (título em destaque, frase grande, lettering na thumbnail do vídeo), use EXATAMENTE esse texto como headline — ele é o título real do conteúdo.
+Só use a legenda como fallback se não houver texto visível na imagem.
+
 Retorne APENAS um JSON puro e válido com esta estrutura exata:
 
 {
@@ -103,7 +108,7 @@ Retorne APENAS um JSON puro e válido com esta estrutura exata:
     "text": "frase exata de abertura que chama atenção (da imagem ou legenda)",
     "technique": "nome da técnica (Pergunta provocativa | Quebra de padrão | Afirmação polêmica | Curiosidade | Número | Promessa | História)"
   },
-  "headline": "manchete/promessa principal em até 6 palavras",
+  "headline": "texto visível na capa/thumbnail do vídeo — ou manchete extraída da legenda se não houver texto na imagem",
   "promise": "transformação que o conteúdo promete ao espectador",
   "body_structure": ["ponto 1", "ponto 2", "ponto 3"],
   "authority_arc": "como o autor demonstra autoridade (prova social, história, tom de certeza)",
