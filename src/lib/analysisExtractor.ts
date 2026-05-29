@@ -58,7 +58,7 @@ export function extractAnalysisFromCaption(caption: string): PostAnalysis {
     .slice(0, 3);
 
   return {
-    headline: (lines[0] || hook).substring(0, 60),
+    headline: hook, // primeira frase completa, sem truncagem
     hook: { text: hook, technique: detectHookTechnique(hook) },
     promise: bodyLines[0] || '',
     authority_arc: '',
