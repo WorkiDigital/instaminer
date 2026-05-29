@@ -19,6 +19,7 @@ interface BusinessDiscoveryResult {
     like_count?: number;
     comments_count?: number;
     media_type?: string;
+    media_product_type?: string;
     permalink: string;
     timestamp?: string;
     thumbnail_url?: string;
@@ -103,6 +104,7 @@ export function useMining() {
           ig_media_id: m.id,
           permalink: m.permalink,
           media_type: m.media_type || null,
+          media_product_type: m.media_product_type || null,
           caption: m.caption || null,
           like_count: m.like_count || 0,
           comments_count: m.comments_count || 0,

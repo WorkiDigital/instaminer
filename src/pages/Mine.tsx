@@ -125,6 +125,26 @@ export function MinePage() {
     return { label: '↓ Abaixo', className: 'badge-info' };
   };
 
+  const getMediaBadge = (mediaType: string | null, productType: string | null) => {
+    const t = (productType || mediaType || '').toUpperCase();
+    if (t === 'REELS' || t === 'REEL') return { label: 'REELS', color: '#7C3AED' };
+    if (t === 'CAROUSEL_ALBUM' || t === 'CAROUSEL') return { label: 'CARROSSEL', color: '#0891B2' };
+    if (t === 'IMAGE' || t === 'FOTO') return { label: 'FOTO', color: '#059669' };
+    if (t === 'VIDEO' || t === 'FEED') return { label: 'VÍDEO', color: '#D97706' };
+    return null;
+  };
+
+  const formatDate = (iso: string | null) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    const now = Date.now();
+    const diff = Math.floor((now - d.getTime()) / 86400000);
+    if (diff === 0) return 'hoje';
+    if (diff === 1) return 'ontem';
+    if (diff < 30) return `${diff}d atrás`;
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  };
+
   return (
     <PageLayout
       title="Mineração"
@@ -278,6 +298,7 @@ export function MinePage() {
                       <div key={post.id} className="card animate-slide-up">
                         {/* Embed / Thumbnail */}
                         {(() => {
+                          const mediaBadge = getMediaBadge(post.media_type, (post as MinedPost & { media_product_type?: string }).media_product_type ?? null);
                           const shortcode = getShortcode(post.permalink);
                           const embedUrl = shortcode
                             ? `https://www.instagram.com/p/${shortcode}/embed/`
@@ -304,6 +325,17 @@ export function MinePage() {
                                 borderBottom: '1px solid var(--border-light)',
                               }}
                             >
+                              {/* Badge de tipo no canto superior esquerdo */}
+                              {mediaBadge && (
+                                <div style={{
+                                  position: 'absolute', top: 10, left: 10, zIndex: 2,
+                                  background: mediaBadge.color, color: '#fff',
+                                  fontSize: 10, fontWeight: 700, letterSpacing: '0.5px',
+                                  padding: '3px 8px', borderRadius: 4,
+                                }}>
+                                  {mediaBadge.label}
+                                </div>
+                              )}
                               {post.thumbnail_url && (
                                 <img
                                   src={post.thumbnail_url}
@@ -353,7 +385,7 @@ export function MinePage() {
 
                         <div className="card-body" style={{ padding: 14 }}>
                           {/* Metrics row */}
-                          <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
+                          <div style={{ display: 'flex', gap: 12, marginBottom: 10, alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-secondary)' }}>
                               <Heart size={14} style={{ color: 'var(--brand-pink)' }} />
                               {post.like_count?.toLocaleString() || 0}
@@ -362,6 +394,11 @@ export function MinePage() {
                               <MessageCircle size={14} style={{ color: 'var(--brand-purple)' }} />
                               {post.comments_count?.toLocaleString() || 0}
                             </div>
+                            {post.posted_at && (
+                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                {formatDate(post.posted_at)}
+                              </span>
+                            )}
                             {perfBadge && (
                               <span className={`badge ${perfBadge.className}`} style={{ marginLeft: 'auto' }}>
                                 {perfBadge.label}
@@ -379,6 +416,26 @@ export function MinePage() {
                             }}>
                               {post.caption}
                             </p>
+                          )}
+
+                          {/* Headline + gancho (extraídos automaticamente) */}
+                          {post.analysis?.headline && (
+                            <div style={{ marginBottom: 10 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                                {post.analysis.headline}
+                              </div>
+                              {post.analysis.hook?.text && (
+                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                                  <span style={{ color: 'var(--brand-pink)', flexShrink: 0 }}>↪</span>
+                                  <span style={{ fontStyle: 'italic' }}>"{post.analysis.hook.text}"</span>
+                                  {post.analysis.hook.technique && (
+                                    <span className="badge badge-info" style={{ fontSize: 9, flexShrink: 0 }}>
+                                      {post.analysis.hook.technique}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
 
                           {/* Transcript — só aparece quando transcrito via vídeo */}
@@ -492,9 +549,6 @@ export function MinePage() {
 
 
       <style>{`
-        .fallback-overlay.show-fallback {
-          display: flex !important;
-        }
         @media (max-width: 768px) {
           .page-content > div:last-child {
             grid-template-columns: 1fr !important;

@@ -138,6 +138,7 @@ export interface Database {
           ig_media_id: string | null;
           permalink: string;
           media_type: string | null;
+          media_product_type: string | null;
           caption: string | null;
           like_count: number | null;
           comments_count: number | null;
@@ -156,6 +157,7 @@ export interface Database {
           ig_media_id?: string | null;
           permalink: string;
           media_type?: string | null;
+          media_product_type?: string | null;
           caption?: string | null;
           like_count?: number | null;
           comments_count?: number | null;

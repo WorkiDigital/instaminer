@@ -33,7 +33,13 @@ export function ContentDetailPage() {
     (async () => {
       const { data, error } = await supabase
         .from('content_items')
-        .select('*')
+        .select(`
+          *,
+          mined_posts (
+            caption,
+            transcript
+          )
+        `)
         .eq('id', id)
         .single();
 
@@ -43,7 +49,10 @@ export function ContentDetailPage() {
         return;
       }
 
-      setItem(data);
+      // @ts-ignore
+      const postRef = data.mined_posts;
+      // @ts-ignore
+      setItem({ ...data, mined_posts: postRef });
       setTitle(data.title || '');
       setScript(data.generated_script || '');
       setHook(data.hook || '');
@@ -237,6 +246,38 @@ export function ContentDetailPage() {
                   </div>
                 )}
               </div>
+              
+              {/* Reference original content */}
+              {/* @ts-ignore */}
+              {(item.mined_posts?.caption || item.mined_posts?.transcript) && (
+                <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-light)', background: 'var(--bg-surface)' }}>
+                  {/* @ts-ignore */}
+                  {item.mined_posts?.caption && (
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                        Legenda Original
+                      </div>
+                      <p style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                        {/* @ts-ignore */}
+                        {item.mined_posts.caption}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* @ts-ignore */}
+                  {item.mined_posts?.transcript && (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                        Transcrição (Roteiro Modelo)
+                      </div>
+                      <p style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.5, background: 'var(--bg-body)', padding: 12, borderRadius: 8 }}>
+                        {/* @ts-ignore */}
+                        {item.mined_posts.transcript}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

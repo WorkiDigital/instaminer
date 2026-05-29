@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
   const fields = [
     `business_discovery.username(${cleanUsername}){`,
     "id,username,name,profile_picture_url,followers_count,media_count",
-    ",media.limit(24){id,caption,like_count,comments_count,media_type,permalink,timestamp,thumbnail_url}",
+    ",media.limit(24){id,caption,like_count,comments_count,media_type,media_product_type,permalink,timestamp,thumbnail_url}",
     "}",
   ].join("");
 
