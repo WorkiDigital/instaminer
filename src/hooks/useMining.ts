@@ -109,7 +109,7 @@ export function useMining() {
           performance_ratio: avgLikes > 0 ? (m.like_count || 0) / avgLikes : null,
           transcript_source: m.caption ? 'caption' : 'none',
           transcript: m.caption || null,
-          analysis: analysis as never,
+          analysis: analysis,
           is_analyzed: !!analysis,
         };
       });
@@ -246,7 +246,7 @@ export function useMining() {
           .eq('id', postId);
         if (error) throw new Error('Erro ao salvar análise no banco.');
         setSavedPosts(prev => prev.map(p =>
-          p.id === postId ? { ...p, is_analyzed: true, analysis: analysis as never } : p
+          p.id === postId ? { ...p, is_analyzed: true, analysis } : p
         ));
       }
 
@@ -285,7 +285,7 @@ export function useMining() {
 
       setSavedPosts(prev => prev.map(p =>
         p.id === postId
-          ? { ...p, transcript: data?.transcript ?? null, is_analyzed: true, analysis: (data?.analysis as unknown) as import('../types/database').PostAnalysis | null }
+          ? { ...p, transcript: data?.transcript ?? null, is_analyzed: true, analysis: (data?.analysis ?? null) as import('../types/database').PostAnalysis | null }
           : p
       ));
       toast.success('Transcrição concluída!', { id: toastId });

@@ -76,7 +76,7 @@ export function MinePage() {
     }
   }, [savedProfile, loadProfilePosts]);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!username.trim()) return;
     await searchProfile(username.trim());
@@ -393,7 +393,7 @@ export function MinePage() {
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontWeight: 600, color: 'var(--brand-purple)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <Sparkles size={12} />
-                                  Análise Gemini 2.5
+                                  {post.transcript_source === 'whisper' ? 'Análise Gemini 2.5' : 'Análise'}
                                 </span>
                                 <span className="badge badge-info" style={{ fontSize: 10 }}>{post.analysis.funnel_stage}</span>
                               </div>

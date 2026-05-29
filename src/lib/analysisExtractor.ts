@@ -38,14 +38,6 @@ function detectFunnelStage(text: string): string {
   return 'TOFU';
 }
 
-function detectContentType(text: string): string {
-  if (/vend[aeo]|compr[ae]|oferta|preço|desconto/i.test(text)) return 'venda';
-  if (/bast[ie]dores|dia a dia|rotina|vida real/i.test(text)) return 'bastidores';
-  if (/motiv[ae]|inspir[ae]|acredit[ae]|força|nunca desist/i.test(text)) return 'inspiração';
-  if (/notícia|trend|viral|novo|lançamento/i.test(text)) return 'entretenimento';
-  return 'educativo';
-}
-
 function extractTheme(text: string): string {
   const tags = text.match(/#(\w+)/g);
   if (tags && tags.length > 0) return tags[0].replace('#', '');
@@ -58,33 +50,21 @@ export function extractAnalysisFromCaption(caption: string): PostAnalysis {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
   const hook = firstSentence(lines[0] || text);
-  const hookTechnique = detectHookTechnique(hook);
   const cta = detectCta(text);
-  const funnelStage = detectFunnelStage(text);
 
-  // Headline: primeira linha até 60 chars
-  const headline = (lines[0] || hook).substring(0, 60);
-
-  // Body: linhas do meio sem hashtags, máx 3
   const bodyLines = lines
     .slice(1)
     .filter(l => !l.startsWith('#') && l.length > 10)
     .slice(0, 3);
 
-  // Promise: segunda frase/linha
-  const promise = bodyLines[0] || '';
-
-  // Theme
-  const mainTheme = extractTheme(text);
-
   return {
-    headline,
-    hook: { text: hook, technique: hookTechnique as never },
-    promise,
+    headline: (lines[0] || hook).substring(0, 60),
+    hook: { text: hook, technique: detectHookTechnique(hook) },
+    promise: bodyLines[0] || '',
     authority_arc: '',
-    body_structure: bodyLines as never,
-    cta: { text: cta.text, type: cta.type as never },
-    funnel_stage: funnelStage as never,
-    main_theme: mainTheme,
+    body_structure: bodyLines,
+    cta,
+    funnel_stage: detectFunnelStage(text),
+    main_theme: extractTheme(text),
   };
 }

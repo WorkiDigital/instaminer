@@ -173,6 +173,9 @@ export interface Database {
           analysis?: PostAnalysis | null;
           performance_ratio?: number | null;
           is_analyzed?: boolean;
+          like_count?: number | null;
+          comments_count?: number | null;
+          thumbnail_url?: string | null;
         };
         Relationships: [];
       };
@@ -314,20 +317,21 @@ export type BodyStructure =
 
 export type CTAType = 'explicito' | 'implicito' | 'ausente';
 
+// PostAnalysis é JSONB — aceita strings livres (extrator de código + IA)
 export interface PostAnalysis {
   headline: string;
   hook: {
     text: string;
-    technique: HookTechnique;
+    technique: string;
   };
   promise: string;
   authority_arc: string;
-  body_structure: BodyStructure;
+  body_structure: string[] | string;
   cta: {
     text: string;
-    type: CTAType;
+    type: string;
   };
-  funnel_stage: FunnelStage;
+  funnel_stage: string; // 'TOFU' | 'MOFU' | 'BOFU' (análise) ou 'top'|'middle'|'bottom' (pipeline)
   main_theme: string;
 }
 
