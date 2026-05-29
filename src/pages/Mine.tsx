@@ -418,26 +418,6 @@ export function MinePage() {
                             </p>
                           )}
 
-                          {/* Headline + gancho (extraídos automaticamente) */}
-                          {post.analysis?.headline && (
-                            <div style={{ marginBottom: 10 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                                {post.analysis.headline}
-                              </div>
-                              {post.analysis.hook?.text && (
-                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-                                  <span style={{ color: 'var(--brand-pink)', flexShrink: 0 }}>↪</span>
-                                  <span style={{ fontStyle: 'italic' }}>"{post.analysis.hook.text}"</span>
-                                  {post.analysis.hook.technique && (
-                                    <span className="badge badge-info" style={{ fontSize: 9, flexShrink: 0 }}>
-                                      {post.analysis.hook.technique}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
                           {/* Transcript — só aparece quando transcrito via vídeo */}
                           {post.transcript_source === 'whisper' && post.transcript && (
                             <div style={{
