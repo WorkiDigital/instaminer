@@ -9,9 +9,7 @@ import {
   Settings,
   LogOut,
   Camera,
-  X,
-  PanelLeftClose,
-  PanelLeftOpen,
+  X
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -69,15 +67,6 @@ export function Sidebar({ mobileOpen, onCloseMobile, collapsed, onToggleCollapse
             <X size={18} />
           </button>
         </div>
-
-        {/* Toggle button — floats on the right edge of the sidebar */}
-        <button
-          className="sidebar-toggle-btn"
-          onClick={onToggleCollapse}
-          title={collapsed ? 'Expandir menu' : 'Recolher menu'}
-        >
-          {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-        </button>
 
         {/* Instagram connection indicator */}
         <div className="sidebar-status" title={profile?.brand_name || 'Conectar Instagram'}>
@@ -158,31 +147,6 @@ export function Sidebar({ mobileOpen, onCloseMobile, collapsed, onToggleCollapse
           padding: 8px 12px;
           margin-bottom: 4px;
         }
-        /* Toggle button on the right edge of sidebar */
-        .sidebar-toggle-btn {
-          position: absolute;
-          top: 20px;
-          right: -14px;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 1px solid var(--border-light);
-          background: var(--bg-elevated);
-          color: var(--text-secondary);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          z-index: calc(var(--z-sidebar) + 1);
-          box-shadow: 0 2px 6px rgba(0,0,0,0.12);
-          transition: background 150ms, color 150ms, box-shadow 150ms;
-        }
-        .sidebar-toggle-btn:hover {
-          background: var(--bg-surface);
-          color: var(--text-primary);
-          box-shadow: 0 3px 10px rgba(0,0,0,0.18);
-        }
-
         /* Collapsed state */
         .sidebar.collapsed { width: var(--sidebar-collapsed); }
         .sidebar.collapsed .sidebar-label { display: none; }
@@ -197,7 +161,6 @@ export function Sidebar({ mobileOpen, onCloseMobile, collapsed, onToggleCollapse
         @media (max-width: 768px) {
           .sidebar-mobile-overlay { display: block !important; }
           .sidebar .btn-icon[aria-label="Fechar menu"] { display: flex !important; }
-          .sidebar-toggle-btn { display: none; }
         }
       `}</style>
     </>

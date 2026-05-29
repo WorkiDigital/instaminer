@@ -307,6 +307,35 @@ export function useMining() {
     }
   }, []);
 
+  const deleteProfile = useCallback(async (profileId: string) => {
+    try {
+      const { error } = await supabase
+        .from('mined_profiles')
+        .delete()
+        .eq('id', profileId);
+
+      if (error) {
+        toast.error('Erro ao remover perfil');
+        console.error(error);
+        return false;
+      }
+
+      setSavedPosts(prev => {
+        if (prev.length > 0 && prev[0].mined_profile_id === profileId) {
+          return [];
+        }
+        return prev;
+      });
+
+      toast.success('Perfil removido com sucesso!');
+      return true;
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao remover perfil');
+      return false;
+    }
+  }, []);
+
   return {
     searchLoading,
     postsLoading,
@@ -320,5 +349,6 @@ export function useMining() {
     loadProfilePosts,
     analyzePost,
     transcribePost,
+    deleteProfile,
   };
 }

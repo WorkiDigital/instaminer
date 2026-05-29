@@ -5,8 +5,9 @@ import { useAuth } from '../hooks/useAuth';
 import type { ContentItem, ContentMetric } from '../types/database';
 import {
   BarChart3, TrendingUp, Eye, Heart,
-  Play, Zap, Target, Sparkles,
+  Play, Zap, Target, Sparkles, RefreshCw,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line,
@@ -19,6 +20,7 @@ export function DashboardPage() {
   const [postedItems, setPostedItems] = useState<ContentItem[]>([]);
   const [metrics, setMetrics] = useState<ContentMetric[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -54,6 +56,28 @@ export function DashboardPage() {
 
     return () => clearTimeout(timeoutId);
   }, [fetchData]);
+
+  const refreshAllMetrics = useCallback(async () => {
+    if (!user || refreshing) return;
+    const itemsWithMedia = postedItems.filter(i => i.ig_media_id);
+    if (itemsWithMedia.length === 0) {
+      toast.error('Nenhum post com ig_media_id encontrado.');
+      return;
+    }
+    setRefreshing(true);
+    toast.loading('Atualizando métricas...', { id: 'refresh-metrics' });
+    let success = 0;
+    for (const item of itemsWithMedia) {
+      const { error } = await supabase.functions.invoke('fetch-post-metrics', {
+        body: { content_item_id: item.id },
+      });
+      if (!error) success++;
+    }
+    toast.dismiss('refresh-metrics');
+    toast.success(`${success}/${itemsWithMedia.length} posts atualizados`);
+    setRefreshing(false);
+    void fetchData();
+  }, [user, refreshing, postedItems, fetchData]);
 
   // Calculate KPIs
   const totalPosts = postedItems.length;
@@ -108,6 +132,16 @@ export function DashboardPage() {
     <PageLayout
       title="Performance"
       subtitle="Métricas e padrões da sua audiência"
+      actions={
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={() => void refreshAllMetrics()}
+          disabled={refreshing}
+        >
+          <RefreshCw size={14} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+          {refreshing ? 'Atualizando...' : 'Atualizar métricas'}
+        </button>
+      }
     >
       {loading ? (
         <div>

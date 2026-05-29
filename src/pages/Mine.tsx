@@ -5,7 +5,8 @@ import { usePipeline } from '../hooks/usePipeline';
 import type { MinedProfile, MinedPost } from '../types/database';
 import {
   Search, TrendingUp, Heart, MessageCircle, Eye,
-  Sparkles, Plus, ExternalLink, AlertTriangle, Users, ChevronRight, Mic, Video
+  Sparkles, Plus, ExternalLink, AlertTriangle, Users, ChevronRight, Mic, Video,
+  Trash2, X
 } from 'lucide-react';
 
 export function MinePage() {
@@ -18,25 +19,28 @@ export function MinePage() {
     loadSavedProfiles,
     loadProfilePosts,
     transcribePost,
+    deleteProfile,
   } = useMining();
 
   const { createItem } = usePipeline();
 
   const handleSendToPipeline = async (post: MinedPost) => {
     const title = post.analysis?.headline || (post.caption ? post.caption.substring(0, 50) + '...' : 'Ideia de conteúdo');
-    
-    // Convert TOFU/MOFU/BOFU to top/middle/bottom for the DB enum
+
     const rawStage = post.analysis?.funnel_stage?.toUpperCase() || '';
     let dbStage: 'top' | 'middle' | 'bottom' = 'top';
     if (rawStage === 'MOFU') dbStage = 'middle';
     if (rawStage === 'BOFU') dbStage = 'bottom';
 
     await createItem({
-      title: title,
+      title,
       source_mined_post_id: post.id,
       source_analysis: post.analysis,
       funnel_stage: dbStage,
-      target_audience_id: null, // Will be selected in the Pipeline stage
+      hook: post.analysis?.hook?.text || null,
+      headline: post.analysis?.headline || null,
+      cta: post.analysis?.cta?.text || null,
+      target_audience_id: null,
     });
   };
 
@@ -46,6 +50,7 @@ export function MinePage() {
   const [selectedProfile, setSelectedProfile] = useState<MinedProfile | null>(null);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [activeEmbedId, setActiveEmbedId] = useState<string | null>(null);
+  const [profileToDelete, setProfileToDelete] = useState<MinedProfile | null>(null);
 
   const getShortcode = (permalink: string) => {
     const m = permalink.match(/instagram\.com\/(?:p|reel|tv)\/([^/?]+)/);
@@ -85,6 +90,24 @@ export function MinePage() {
   const handleSelectProfile = async (profile: MinedProfile) => {
     setSelectedProfile(profile);
     await loadProfilePosts(profile.id);
+  };
+
+  const handleDeleteProfileClick = (e: React.MouseEvent, profile: MinedProfile) => {
+    e.stopPropagation();
+    setProfileToDelete(profile);
+  };
+
+  const confirmDeleteProfile = async () => {
+    if (!profileToDelete) return;
+    const profileId = profileToDelete.id;
+    const success = await deleteProfile(profileId);
+    if (success) {
+      setSavedProfiles(prev => prev.filter(p => p.id !== profileId));
+      if (selectedProfile?.id === profileId) {
+        setSelectedProfile(null);
+      }
+    }
+    setProfileToDelete(null);
   };
 
   const ProfileAvatar = ({ url, username, size }: { url: string | null; username: string; size: number }) => {
@@ -198,7 +221,7 @@ export function MinePage() {
         </div>
       </form>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="mine-layout-grid" style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
         {/* Saved profiles list */}
         <div className="card">
           <div className="card-header">
@@ -221,13 +244,14 @@ export function MinePage() {
               </div>
             ) : (
               savedProfiles.map(profile => (
-                <button
+                <div
                   key={profile.id}
                   onClick={() => handleSelectProfile(profile)}
+                  className="profile-item-row"
                   style={{
                     width: '100%', padding: '10px 12px',
                     background: selectedProfile?.id === profile.id ? 'var(--info-bg)' : 'transparent',
-                    border: 'none', borderRadius: 'var(--radius-md)',
+                    borderRadius: 'var(--radius-md)',
                     display: 'flex', alignItems: 'center', gap: 10,
                     cursor: 'pointer', transition: 'all 150ms ease',
                     textAlign: 'left',
@@ -242,8 +266,29 @@ export function MinePage() {
                       {profile.followers_count?.toLocaleString() || '—'} seguidores
                     </div>
                   </div>
-                  <ChevronRight size={14} style={{ color: 'var(--text-tertiary)' }} />
-                </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <button
+                      onClick={(e) => handleDeleteProfileClick(e, profile)}
+                      className="profile-delete-btn"
+                      title="Remover perfil"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 6,
+                        borderRadius: '50%',
+                        cursor: 'pointer',
+                        color: 'var(--text-tertiary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 150ms ease',
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                    <ChevronRight size={14} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                  </div>
+                </div>
               ))
             )}
           </div>
@@ -263,6 +308,11 @@ export function MinePage() {
                       <span>{selectedProfile.followers_count?.toLocaleString() || '—'} seguidores</span>
                       <span>Média: {Math.round(selectedProfile.avg_likes || 0)} likes</span>
                       <span>{Math.round(selectedProfile.avg_comments || 0)} comentários</span>
+                      {selectedProfile.last_synced_at && (
+                        <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>
+                          Sincronizado {formatDate(selectedProfile.last_synced_at)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <a
@@ -399,6 +449,12 @@ export function MinePage() {
                                 {formatDate(post.posted_at)}
                               </span>
                             )}
+                            {/* Badge de fonte de transcrição */}
+                            {post.transcript_source === 'whisper' ? (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--success)', background: 'var(--success-bg)', padding: '2px 6px', borderRadius: 4 }}>🎙 Whisper</span>
+                            ) : post.transcript_source === 'caption' ? (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--bg-surface)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-light)' }}>📝 Legenda</span>
+                            ) : null}
                             {perfBadge && (
                               <span className={`badge ${perfBadge.className}`} style={{ marginLeft: 'auto' }}>
                                 {perfBadge.label}
@@ -406,17 +462,7 @@ export function MinePage() {
                             )}
                           </div>
 
-                          {/* Caption */}
-                          {post.caption && (
-                            <p style={{
-                              fontSize: 12, color: 'var(--text-secondary)',
-                              lineHeight: 1.5, marginBottom: 12,
-                              display: '-webkit-box', WebkitLineClamp: 3,
-                              WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                            }}>
-                              {post.caption}
-                            </p>
-                          )}
+
 
                           {/* Transcript — só aparece quando transcrito via vídeo */}
                           {post.transcript_source === 'whisper' && post.transcript && (
@@ -446,27 +492,91 @@ export function MinePage() {
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontWeight: 600, color: 'var(--brand-purple)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <Sparkles size={12} />
-                                  {post.transcript_source === 'whisper' ? 'Análise Gemini 2.5' : 'Análise'}
+                                  {post.transcript_source === 'whisper' ? 'Análise Gemini 2.5' : 'Análise da Legenda'}
                                 </span>
                                 <span className="badge badge-info" style={{ fontSize: 10 }}>{post.analysis.funnel_stage}</span>
                               </div>
-                              
-                              <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Headline / Promessa</span>
-                                <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.headline}</div>
-                              </div>
 
-                              <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Gancho ({post.analysis.hook?.technique})</span>
-                                <div style={{ fontStyle: 'italic', borderLeft: '2px solid var(--brand-pink)', paddingLeft: 8, marginTop: 4, color: 'var(--text-secondary)' }}>
-                                  "{post.analysis.hook?.text}"
+                              {post.caption && (
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Legenda Completa</span>
+                                  <div className="custom-scrollbar" style={{
+                                    fontSize: 12, color: 'var(--text-primary)',
+                                    lineHeight: 1.5, marginTop: 4,
+                                    maxHeight: 120, overflowY: 'auto',
+                                    whiteSpace: 'pre-wrap', paddingRight: 4,
+                                    background: 'var(--bg-elevated)', border: '1px solid var(--border-light)',
+                                    borderRadius: 'var(--radius-sm)', padding: 8
+                                  }}>
+                                    {post.caption}
+                                  </div>
                                 </div>
-                              </div>
+                              )}
+
+                              {/* Headline só aparece quando a IA teve acesso ao vídeo real */}
+                              {post.transcript_source === 'whisper' && post.analysis.headline && (
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Headline / Promessa</span>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.headline}</div>
+                                </div>
+                              )}
+
+                              {/* Gancho só aparece com transcrição real (da thumbnail/voz, não da legenda) */}
+                              {post.transcript_source === 'whisper' && post.analysis.hook?.text && (
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Gancho ({post.analysis.hook?.technique})</span>
+                                  <div style={{ fontStyle: 'italic', borderLeft: '2px solid var(--brand-pink)', paddingLeft: 8, marginTop: 4, color: 'var(--text-secondary)' }}>
+                                    "{post.analysis.hook?.text}"
+                                  </div>
+                                </div>
+                              )}
                               
-                              <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Chamada para Ação ({post.analysis.cta?.type})</span>
-                                <div style={{ color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.cta?.text}</div>
-                              </div>
+                              {post.analysis.cta?.text && (
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Chamada para Ação ({post.analysis.cta?.type})</span>
+                                  <div style={{ color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.cta?.text}</div>
+                                </div>
+                              )}
+
+                              {/* Estrutura do corpo */}
+                              {post.analysis.body_structure && (Array.isArray(post.analysis.body_structure) ? post.analysis.body_structure.length > 0 : post.analysis.body_structure) && (
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Estrutura do Conteúdo</span>
+                                  <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {Array.isArray(post.analysis.body_structure)
+                                      ? post.analysis.body_structure.map((step, i) => (
+                                          <div key={i} style={{ fontSize: 11, color: 'var(--text-primary)', display: 'flex', gap: 6 }}>
+                                            <span style={{ color: 'var(--brand-purple)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                                            <span>{step}</span>
+                                          </div>
+                                        ))
+                                      : <div style={{ fontSize: 11, color: 'var(--text-primary)' }}>{post.analysis.body_structure as string}</div>
+                                    }
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Tema principal */}
+                              {post.analysis.main_theme && (
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Tema Principal</span>
+                                  <div style={{ fontSize: 11, color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.main_theme}</div>
+                                </div>
+                              )}
+
+                              {/* Aviso quando análise foi feita só por legenda */}
+                              {post.transcript_source !== 'whisper' && (
+                                <div style={{
+                                  display: 'flex', alignItems: 'center', gap: 6,
+                                  padding: '6px 8px',
+                                  background: 'var(--warning-bg)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  fontSize: 11, color: 'var(--warning)',
+                                }}>
+                                  <Mic size={11} />
+                                  Transcreva o vídeo para ver headline e gancho reais
+                                </div>
+                              )}
                             </div>
                           ) : null}
 
@@ -528,9 +638,60 @@ export function MinePage() {
       </div>
 
 
+      {/* Custom Confirmation Modal */}
+      {profileToDelete && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setProfileToDelete(null); }}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-header" style={{ borderBottom: 'none', padding: '20px 24px 10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'var(--error-bg)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--error)'
+                }}>
+                  <AlertTriangle size={18} />
+                </div>
+                <h3 style={{ fontSize: 16, fontWeight: 700 }}>Remover Perfil</h3>
+              </div>
+              <button className="btn-icon" onClick={() => setProfileToDelete(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: '0 24px 20px' }}>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                Tem certeza de que deseja remover o perfil de <strong style={{ color: 'var(--text-primary)' }}>@{profileToDelete.ig_username}</strong>?
+              </p>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 8 }}>
+                Esta ação é irreversível. Todos os posts minerados, transcrições e análises vinculados a ele serão perdidos permanentemente.
+              </p>
+            </div>
+            <div className="modal-footer" style={{ borderTop: 'none', padding: '10px 24px 20px', gap: 12 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setProfileToDelete(null)} style={{ flex: 1 }}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-danger" onClick={confirmDeleteProfile} style={{ flex: 1 }}>
+                Confirmar Exclusão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       <style>{`
+        .profile-item-row {
+          transition: background-color 150ms ease;
+        }
+        .profile-item-row:hover {
+          background-color: var(--bg-surface) !important;
+        }
+        .profile-delete-btn:hover {
+          color: var(--error) !important;
+          background-color: var(--error-bg) !important;
+        }
         @media (max-width: 768px) {
-          .page-content > div:last-child {
+          .mine-layout-grid {
             grid-template-columns: 1fr !important;
           }
         }

@@ -50,10 +50,13 @@ Deno.serve(async (req) => {
     return json({ error: "Card de conteúdo não encontrado" }, 404);
   }
 
-  // 1.5 Fetch brand tone e público-alvo em paralelo
-  const [profileResult, audienceResult] = await Promise.all([
+  // 1.5 Fetch brand tone, público-alvo e mined_post em paralelo
+  const [profileResult, audienceResult, minedPostResult] = await Promise.all([
     adminClient.from("profiles").select("brand_tone").eq("id", userData.user.id).maybeSingle(),
     adminClient.from("target_audiences").select("*").eq("id", target_audience_id).single(),
+    item.source_mined_post_id
+      ? adminClient.from("mined_posts").select("transcript, caption").eq("id", item.source_mined_post_id).single()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const audience = audienceResult.data;
@@ -64,16 +67,24 @@ Deno.serve(async (req) => {
   const analysis = item.source_analysis || {};
   const profile = profileResult.data;
 
+  // Roteiro real tem prioridade; legenda como fallback
+  const minedPost = minedPostResult.data as { transcript?: string; caption?: string } | null;
+  const roteirModelo = minedPost?.transcript || minedPost?.caption || null;
+
   // 2. Montar o super-prompt
   const promptText = `
 Você é um estrategista de conteúdo para Instagram e um excelente Copywriter.
-Sua missão é MODELAR (não copiar) a estrutura de um post viral de referência, mas criar um roteiro 100% INÉDITO para o público-alvo e nicho do usuário.
+Sua missão é MODELAR (não copiar) a estrutura de um post viral de referência e criar um roteiro 100% INÉDITO para o público-alvo e nicho do usuário.
 
-📋 **A ESTRUTURA DO POST VIRAL ORIGINAL:**
+${roteirModelo ? `🎬 **ROTEIRO ORIGINAL DO POST DE REFERÊNCIA:**
+"${roteirModelo}"
+
+` : ''}📋 **ESTRUTURA ANALISADA DO POST ORIGINAL:**
 - Gancho (Técnica): ${analysis.hook?.technique || 'Geral'}
-- Promessa/Headline Original: ${analysis.headline || item.title || 'Nenhuma'}
-- Estrutura do Corpo: ${analysis.body_structure || 'Lista/Narrativa'}
-- Chamada para Ação (CTA): ${analysis.cta?.text || 'Nenhuma'} (${analysis.cta?.type || ''})
+- Gancho (Texto): ${analysis.hook?.text || 'N/A'}
+- Promessa/Headline: ${analysis.headline || item.title || 'Nenhuma'}
+- Estrutura do Corpo: ${Array.isArray(analysis.body_structure) ? analysis.body_structure.join(', ') : analysis.body_structure || 'Lista/Narrativa'}
+- CTA: ${analysis.cta?.text || 'Nenhuma'} (${analysis.cta?.type || ''})
 - Etapa do Funil: ${item.funnel_stage || 'Topo'}
 
 🎯 **O MEU PÚBLICO-ALVO:**
@@ -88,18 +99,19 @@ Sua missão é MODELAR (não copiar) a estrutura de um post viral de referência
 - Tom de Voz da Marca: ${profile?.brand_tone || 'Autoridade, acolhedor e direto'}
 
 ---
-**INSTRUÇÕES DE GERAÇÃO:**
-1. Baseado nas dores e desejos do MEU público, crie um novo tema usando a MESMA técnica de Gancho e estrutura do post viral.
-2. Escreva o Roteiro Falado palavra por palavra para um vídeo curto (Reels/TikTok) de 30 a 60 segundos.
-3. Não use jargões difíceis se o público for iniciante, respeite o Nível de Consciência.
-4. O roteiro deve ser fluido, sem marcadores robóticos, como se a pessoa estivesse falando olhando para a câmera.
+**INSTRUÇÕES:**
+1. Use o roteiro original como referência de RITMO, ESTRUTURA e ESTILO de linguagem — não de conteúdo.
+2. Crie um novo tema 100% diferente, adaptado às dores e desejos do meu público.
+3. Mantenha a MESMA técnica de gancho e fluxo narrativo do original.
+4. Escreva o roteiro falado palavra por palavra, de 30 a 60 segundos, fluido como uma conversa direta para a câmera.
+5. Respeite o nível de consciência do público — sem jargões se for iniciante.
 
-Retorne APENAS um JSON válido no seguinte formato:
+Retorne APENAS um JSON válido:
 {
   "new_hook": "O texto exato do novo gancho (primeiros 3 segundos)",
   "new_headline": "O título sugerido para a capa do vídeo",
   "new_cta": "A frase exata do CTA no final do vídeo",
-  "script": "O roteiro COMPLETO falado palavra por palavra, dividindo em parágrafos. Use dicas visuais entre colchetes se precisar, ex: [Corta para a tela do celular]."
+  "script": "O roteiro COMPLETO falado palavra por palavra, em parágrafos. Use [indicações visuais] entre colchetes se necessário."
 }
 `;
 

@@ -57,9 +57,14 @@ export function usePipeline() {
       )
     );
 
+    const updateData: ContentItemUpdate = { status: newStatus };
+    if (newStatus === 'posted') {
+      updateData.posted_at = new Date().toISOString();
+    }
+
     const { error } = await supabase
       .from('content_items')
-      .update({ status: newStatus })
+      .update(updateData)
       .eq('id', itemId);
 
     if (error) {
@@ -68,6 +73,20 @@ export function usePipeline() {
       await fetchItems(); // Revert on error
       return false;
     }
+
+    // Quando avança para 'posted' e tem ig_media_id, busca métricas automaticamente
+    if (newStatus === 'posted') {
+      const item = items.find(i => i.id === itemId);
+      if (item?.ig_media_id) {
+        supabase.functions.invoke('fetch-post-metrics', {
+          body: { content_item_id: itemId },
+        }).then(({ error: metricsError }) => {
+          if (metricsError) console.error('Erro ao buscar métricas:', metricsError);
+          else toast.success('Métricas do post carregadas!');
+        });
+      }
+    }
+
     return true;
   };
 

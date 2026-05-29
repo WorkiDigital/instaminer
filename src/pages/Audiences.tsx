@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { useAudiences } from '../hooks/useAudiences';
+import { supabase } from '../lib/supabase';
 import type { AwarenessLevel } from '../types/database';
 import {
-  Plus, Users, Edit2, Trash2, Star, X, Save, AlertCircle
+  Plus, Users, Edit2, Trash2, Star, X, Save, AlertCircle, Copy,
 } from 'lucide-react';
 
 const awarenessOptions: { value: AwarenessLevel; label: string; desc: string }[] = [
@@ -39,6 +40,26 @@ export function AudiencesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
+
+  // Busca contagem de conteúdos por público
+  useEffect(() => {
+    if (audiences.length === 0) return;
+    const ids = audiences.map(a => a.id);
+    supabase
+      .from('content_items')
+      .select('target_audience_id')
+      .in('target_audience_id', ids)
+      .then(({ data }) => {
+        const counts: Record<string, number> = {};
+        for (const row of data || []) {
+          if (row.target_audience_id) {
+            counts[row.target_audience_id] = (counts[row.target_audience_id] || 0) + 1;
+          }
+        }
+        setUsageCounts(counts);
+      });
+  }, [audiences]);
 
   const openNew = () => {
     setEditingId(null);
@@ -56,6 +77,20 @@ export function AudiencesPage() {
       objections: audience.objections || '',
       language_tone: audience.language_tone || '',
       is_default: audience.is_default,
+    });
+    setShowForm(true);
+  };
+
+  const openDuplicate = (audience: typeof audiences[0]) => {
+    setEditingId(null);
+    setForm({
+      name: `Cópia de ${audience.name}`,
+      pain_points: audience.pain_points || '',
+      desires: audience.desires || '',
+      awareness_level: (audience.awareness_level as AwarenessLevel) || 'consciente_problema',
+      objections: audience.objections || '',
+      language_tone: audience.language_tone || '',
+      is_default: false,
     });
     setShowForm(true);
   };
@@ -263,7 +298,15 @@ export function AudiencesPage() {
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 4 }}>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {usageCounts[audience.id] ? (
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginRight: 4 }}>
+                      {usageCounts[audience.id]} conteúdo{usageCounts[audience.id] > 1 ? 's' : ''}
+                    </span>
+                  ) : null}
+                  <button className="btn-icon" onClick={() => openDuplicate(audience)} title="Duplicar">
+                    <Copy size={15} />
+                  </button>
                   <button className="btn-icon" onClick={() => openEdit(audience)} title="Editar">
                     <Edit2 size={15} />
                   </button>
@@ -318,10 +361,18 @@ export function AudiencesPage() {
                   </div>
                 )}
 
-                {!audience.pain_points && !audience.desires && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--warning)' }}>
-                    <AlertCircle size={14} />
-                    Configure dores e desejos para melhores roteiros
+                {(!audience.pain_points || !audience.desires || !audience.language_tone) && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: 'var(--warning)', marginTop: 8 }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span>
+                      {'Preencha '}
+                      {[
+                        !audience.pain_points && 'dores',
+                        !audience.desires && 'desejos',
+                        !audience.language_tone && 'tom de voz',
+                      ].filter(Boolean).join(', ')}
+                      {' para roteiros mais precisos'}
+                    </span>
                   </div>
                 )}
               </div>

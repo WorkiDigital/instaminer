@@ -127,6 +127,11 @@ Deno.serve(async (req) => {
       return json({ error: `Falha ao baixar o vídeo (${videoRes.status}). A URL pode ter expirado — re-mine o perfil.` }, 500);
     }
     videoBytes = await videoRes.arrayBuffer();
+
+    if (!videoBytes || videoBytes.byteLength < 1000) {
+      return json({ error: `Vídeo baixado está vazio ou corrompido (${videoBytes?.byteLength ?? 0} bytes). Tente re-minerar o perfil.` }, 500);
+    }
+    console.log("Video downloaded:", videoBytes.byteLength, "bytes");
   }
 
   // 5. Enviar para Whisper API
@@ -138,7 +143,7 @@ Deno.serve(async (req) => {
   const formData = new FormData();
   formData.append(
     "audio_file",
-    new Blob([videoBytes], { type: mimeType }),
+    new Blob([videoBytes!], { type: mimeType }),
     "instagram-video.mp4"
   );
 
@@ -148,33 +153,107 @@ Deno.serve(async (req) => {
       "https://n8n-whisper-api.ubufeb.easypanel.host/transcribe?language=pt&task=transcribe",
       {
         method: "POST",
-        headers: {
-          "x-api-key": whisperKey,
-        },
+        headers: { "x-api-key": whisperKey },
         body: formData,
       }
     );
 
+    const responseText = await whisperResponse.text();
+    console.log("Whisper status:", whisperResponse.status, "body:", responseText.substring(0, 300));
+
     if (!whisperResponse.ok) {
-      console.error("Whisper error status:", whisperResponse.status);
-      const errorText = await whisperResponse.text().catch(() => "");
-      return json({ error: `Falha ao transcrever vídeo no Whisper. Status: ${whisperResponse.status} - ${errorText}` }, 500);
+      return json({ error: `Whisper retornou erro ${whisperResponse.status}: ${responseText.substring(0, 200)}` }, 500);
     }
 
-    const whisperJson = await whisperResponse.json();
-    transcript = whisperJson.text;
+    let whisperJson: { text?: string; error?: string };
+    try {
+      whisperJson = JSON.parse(responseText);
+    } catch {
+      return json({ error: `Whisper retornou resposta inválida: ${responseText.substring(0, 200)}` }, 500);
+    }
+
+    if (whisperJson.error) {
+      return json({ error: `Whisper reportou erro interno: ${whisperJson.error}` }, 500);
+    }
+
+    transcript = whisperJson.text || "";
   } catch (err) {
     console.error("Whisper request failed", err);
     return json({ error: "Falha de conexão com a API do Whisper." }, 500);
   }
 
-  if (!transcript) {
-    return json({ error: "Whisper não retornou texto. O vídeo pode não ter áudio." }, 500);
+  if (!transcript || transcript.trim().length === 0) {
+    return json({ error: "O Whisper não conseguiu extrair áudio deste vídeo. Pode ser um vídeo sem fala (só música), ou o arquivo chegou corrompido." }, 500);
   }
 
-  const analysis = null; // A análise estruturada precisará ser feita em uma etapa posterior ou pela função ai-analyze
+  // 7. Salvar transcrição antes de analisar
+  await adminClient
+    .from("mined_posts")
+    .update({ transcript, transcript_source: "whisper", is_analyzed: false })
+    .eq("id", post_id);
 
-  // 7. Salvar apenas o texto
+  // 8. Chamar ai-analyze com a transcrição salva
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  let analysis = null;
+
+  if (geminiKey) {
+    try {
+      const { data: postForAnalysis } = await adminClient
+        .from("mined_posts")
+        .select("caption, thumbnail_url")
+        .eq("id", post_id)
+        .single();
+
+      const prompt = `Você é um especialista em marketing de conteúdo para Instagram.
+Analise o roteiro transcrito abaixo e extraia a estrutura do conteúdo em JSON.
+
+ROTEIRO TRANSCRITO:
+${transcript}
+
+${postForAnalysis?.caption ? `LEGENDA DO POST:\n${postForAnalysis.caption}` : ""}
+
+Retorne APENAS o JSON, sem markdown, sem explicações:
+{
+  "headline": "título/promessa principal do vídeo",
+  "hook": {
+    "text": "primeiras palavras ditas (gancho de abertura)",
+    "technique": "pergunta|afirmacao_polemica|numero|promessa|quebra_de_padrao"
+  },
+  "promise": "o que o criador promete entregar",
+  "authority_arc": "como o criador demonstra autoridade",
+  "body_structure": ["passo 1", "passo 2"],
+  "cta": {
+    "text": "chamada para ação",
+    "type": "explicito|implicito|ausente"
+  },
+  "funnel_stage": "TOFU|MOFU|BOFU",
+  "main_theme": "tema central do conteúdo"
+}`;
+
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+          }),
+        }
+      );
+
+      if (geminiRes.ok) {
+        const geminiData = await geminiRes.json();
+        const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        analysis = JSON.parse(cleaned);
+      }
+    } catch (err) {
+      console.error("Gemini analysis failed (non-fatal):", err);
+    }
+  }
+
+  // 9. Salvar transcrição + análise
   await adminClient
     .from("mined_posts")
     .update({ transcript, transcript_source: "whisper", analysis, is_analyzed: true })

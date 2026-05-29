@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Menu } from 'lucide-react';
+import { Menu, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 
 interface PageLayoutProps {
   title: string;
@@ -31,6 +31,14 @@ export function PageLayout({ title, subtitle, children, actions }: PageLayoutPro
             >
               <Menu size={20} />
             </button>
+            <button
+              className="btn-icon desktop-menu-btn"
+              onClick={() => setCollapsed(c => !c)}
+              title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
             <div>
               <h1 style={{ fontSize: 18 }}>{title}</h1>
               {subtitle && (
@@ -55,6 +63,7 @@ export function PageLayout({ title, subtitle, children, actions }: PageLayoutPro
         .mobile-menu-btn { display: none; }
         @media (max-width: 768px) {
           .mobile-menu-btn { display: flex; }
+          .desktop-menu-btn { display: none !important; }
         }
       `}</style>
     </div>

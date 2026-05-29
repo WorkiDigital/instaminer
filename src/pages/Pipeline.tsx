@@ -4,7 +4,7 @@ import { usePipeline } from '../hooks/usePipeline';
 import type { ContentStatus, FunnelStage, ContentItem } from '../types/database';
 import {
   Lightbulb, Sparkles, Video, Send, GripVertical, Plus,
-  ArrowRight, Trash2,
+  ArrowRight, Trash2, ExternalLink,
 } from 'lucide-react';
 
 const columnConfig: Record<ContentStatus, {
@@ -103,6 +103,25 @@ export function PipelinePage() {
                 {item.ig_media_id ? '✓' : '○'} Publicado
               </span>
             </div>
+
+            {/* Se postado: data + link */}
+            {item.status === 'posted' && item.posted_at && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                <span>📅 {new Date(item.posted_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
+                {item.posted_permalink && (
+                  <a
+                    href={item.posted_permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--brand-purple)', display: 'flex', alignItems: 'center', gap: 2 }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <ExternalLink size={10} />
+                    Ver post
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
