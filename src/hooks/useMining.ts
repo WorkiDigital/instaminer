@@ -287,7 +287,13 @@ export function useMining() {
 
       setSavedPosts(prev => prev.map(p =>
         p.id === postId
-          ? { ...p, transcript: data?.transcript ?? null, is_analyzed: true, analysis: (data?.analysis ?? null) as import('../types/database').PostAnalysis | null }
+          ? {
+              ...p,
+              transcript: data?.transcript ?? null,
+              transcript_source: 'whisper',
+              is_analyzed: true,
+              analysis: (data?.analysis ?? null) as import('../types/database').PostAnalysis | null,
+            }
           : p
       ));
       toast.success('Transcrição concluída!', { id: toastId });
