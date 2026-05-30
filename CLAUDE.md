@@ -124,12 +124,25 @@ git push origin main
 ## Notas importantes
 - `PostAnalysis` usa `string` nos campos flexíveis (não enums estritos) — aceita saída do extrator de código e do Gemini
 - O botão "Transcrever" só aparece para posts que não são `IMAGE`
-- O embed do Instagram usa click-to-play (não carrega todos os iframes de uma vez)
+- O embed do Instagram carrega direto (iframe com loading="lazy") — não usa mais click-to-play
 - A sidebar tem toggle de colapso (botão flutuante na borda direita)
 - Erros das Edge Functions sempre retornam HTTP 200 com `{ error: "...", httpStatus: N }` para evitar que o Supabase SDK esconda o corpo do erro
 - `supabase db query --linked` não aceita múltiplos statements nem aspas duplas em linha — usar arquivo `.sql` com `[System.IO.File]::WriteAllText(..., [System.Text.Encoding]::ASCII)`
 - O join PostgREST `mined_posts(transcript, caption)` NÃO funciona via `select("*, mined_posts(...)")` porque a FK se chama `source_mined_post_id` (não padrão). Sempre buscar `mined_posts` em query separada pelo `source_mined_post_id`
 - `instagram_connections` não tem coluna `updated_at` — usar `connected_at` para ordenação
+
+## Storage
+- **Bucket**: `thumbnails` (público) — thumbnails e fotos de perfil cacheadas pelo servidor
+- **Path thumbnails**: `thumbnails/{username}/{shortcode}.jpg` e `thumbnails/{username}/avatar.jpg`
+- **Como funciona**: `instagram-business-discovery` baixa as imagens do CDN do Instagram no servidor e salva no bucket `thumbnails` durante a mineração — evita bloqueio de CORS no browser
+
+## Mineração (Mine.tsx)
+- Grid de 4 colunas fixas (`repeat(4, minmax(0, 340px))`), sidebar 260px, layout `fullWidth` (sem max-width)
+- Paginação local: 9 posts por vez, botão "Ver mais" mostra mais sem nova chamada Apify
+- Embeds carregam direto com `loading="lazy"` — sem click-to-play
+- Scraping via Apify `instagram-api-scraper` (actor ID: `apify~instagram-api-scraper`, input: `directUrls + resultsType + resultsLimit`)
+- Detalhes do perfil (followers, foto) buscados com `resultsType: "details"` em paralelo com posts
+- `mined_posts` tem colunas extras: `video_url`, `video_view_count`, `video_play_count`
 
 ## Atualizações (30/05/2026)
 - **Publicação via Instagram API**: Edge Function `publish-to-instagram` completa (container → polling → publish)
@@ -139,4 +152,4 @@ git push origin main
 - **Pipeline**: exibe `posted_at` e permalink no card da coluna Postado
 - **ContentDetail**: público padrão pré-selecionado, upload funcional, modal de legenda antes de publicar
 - **Audiences**: duplicar público, contagem de uso, aviso de campos incompletos detalhado
-- **Mine**: badge Whisper/Legenda, `body_structure` e `main_theme` visíveis, `last_synced_at` no header
+- **Mine**: migrado para Apify, thumbnails cacheadas no Storage, embeds diretos, 4 colunas, paginação local

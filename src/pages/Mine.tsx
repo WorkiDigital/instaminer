@@ -78,6 +78,7 @@ export function MinePage() {
   const [selectedProfile, setSelectedProfile] = useState<MinedProfile | null>(null);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [activeEmbedId, setActiveEmbedId] = useState<string | null>(null);
+
   const [profileToDelete, setProfileToDelete] = useState<MinedProfile | null>(null);
   const [visibleCount, setVisibleCount] = useState(9);
   const [sortBy, setSortBy] = useState<'recent' | 'likes' | 'comments' | 'views'>('recent');
@@ -141,6 +142,7 @@ export function MinePage() {
     setProfileToDelete(null);
   };
 
+
   const getPerformanceBadge = (ratio: number | null) => {
     if (!ratio) return null;
     if (ratio >= 2) return { label: '🔥 Viral', className: 'badge-error' };
@@ -173,6 +175,7 @@ export function MinePage() {
     <PageLayout
       title="Mineração"
       subtitle="Busque perfis de referência e analise o que performa"
+      fullWidth
     >
       {/* Search bar */}
       <form onSubmit={handleSearch} style={{ marginBottom: 24 }}>
@@ -214,7 +217,7 @@ export function MinePage() {
         </div>
       </form>
 
-      <div className="mine-layout-grid" style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="mine-layout-grid" style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, alignItems: 'start' }}>
         {/* Saved profiles list */}
         <div className="card" style={{ position: 'sticky', top: 24, maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column' }}>
           <div className="card-header" style={{ flexShrink: 0 }}>
@@ -252,7 +255,7 @@ export function MinePage() {
                 >
                   <ProfileAvatar url={profile.profile_picture_url} username={profile.ig_username} size={36} />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div className="truncate" style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, wordBreak: 'break-all' }}>
                       @{profile.ig_username}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -334,9 +337,9 @@ export function MinePage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <h3 style={{ fontSize: 16, margin: 0 }}>Posts Minerados</h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Ordenar por:</label>
-                      <select 
-                        className="input" 
+                      <label style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Ordenar por:</label>
+                      <select
+                        className="input"
                         style={{ height: 36, padding: '0 12px', minWidth: 140 }}
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value as any)}
@@ -351,7 +354,7 @@ export function MinePage() {
 
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                    gridTemplateColumns: 'repeat(4, minmax(0, 340px))',
                     gap: 16,
                   }}>
                     {[...savedPosts].sort((a, b) => {
@@ -361,282 +364,283 @@ export function MinePage() {
                       return new Date(b.posted_at || 0).getTime() - new Date(a.posted_at || 0).getTime();
                     }).slice(0, visibleCount).map(post => {
                       const perfBadge = getPerformanceBadge(post.performance_ratio);
-                    return (
-                      <div key={post.id} className="card animate-slide-up">
-                        {/* Embed / Thumbnail */}
-                        {(() => {
-                          const mediaBadge = getMediaBadge(post.media_type, (post as MinedPost & { media_product_type?: string }).media_product_type ?? null);
-                          const shortcode = getShortcode(post.permalink);
-                          const embedUrl = shortcode
-                            ? `https://www.instagram.com/p/${shortcode}/embed/`
-                            : null;
+                      return (
+                        <div key={post.id} className="card animate-slide-up">
+                          {/* Embed / Thumbnail */}
+                          {(() => {
+                            const mediaBadge = getMediaBadge(post.media_type, (post as MinedPost & { media_product_type?: string }).media_product_type ?? null);
+                            const shortcode = getShortcode(post.permalink);
+                            const embedUrl = shortcode
+                              ? `https://www.instagram.com/p/${shortcode}/embed/`
+                              : null;
 
-                          if (activeEmbedId === post.id && embedUrl) {
+                            if (activeEmbedId === post.id && embedUrl) {
+                              return (
+                                <div style={{ position: 'relative' }}>
+                                  <iframe
+                                    src={embedUrl}
+                                    style={{ width: '100%', height: 480, border: 'none', display: 'block' }}
+                                    allowFullScreen
+                                    loading="lazy"
+                                  />
+                                </div>
+                              );
+                            }
+
                             return (
-                              <iframe
-                                src={embedUrl}
-                                style={{ width: '100%', height: 480, border: 'none', display: 'block' }}
-                                allowFullScreen
-                                loading="lazy"
-                              />
-                            );
-                          }
-
-                          return (
-                            <div
-                              onClick={() => embedUrl && setActiveEmbedId(post.id)}
-                              style={{
-                                height: 400, position: 'relative', overflow: 'hidden',
-                                background: '#000',
-                                cursor: embedUrl ? 'pointer' : 'default',
-                                borderBottom: '1px solid var(--border-light)',
-                              }}
-                            >
-                              {/* Badge de tipo no canto superior esquerdo */}
-                              {mediaBadge && (
-                                <div style={{
-                                  position: 'absolute', top: 10, left: 10, zIndex: 2,
-                                  background: mediaBadge.color, color: '#fff',
-                                  fontSize: 10, fontWeight: 700, letterSpacing: '0.5px',
-                                  padding: '3px 8px', borderRadius: 4,
-                                }}>
-                                  {mediaBadge.label}
-                                </div>
-                              )}
-                              {post.thumbnail_url && (
-                                <img
-                                  src={post.thumbnail_url}
-                                  alt=""
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
-                                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                />
-                              )}
-                              {/* Play button overlay */}
-                              {embedUrl && (
-                                <div style={{
-                                  position: 'absolute', inset: 0,
-                                  display: 'flex', flexDirection: 'column',
-                                  alignItems: 'center', justifyContent: 'center', gap: 8,
-                                }}>
+                              <div
+                                onClick={() => embedUrl && setActiveEmbedId(post.id)}
+                                style={{
+                                  height: 320, position: 'relative', overflow: 'hidden',
+                                  background: '#000',
+                                  cursor: embedUrl ? 'pointer' : 'default',
+                                  borderBottom: '1px solid var(--border-light)',
+                                }}
+                              >
+                                {/* Badge de tipo no canto superior esquerdo */}
+                                {mediaBadge && (
                                   <div style={{
-                                    width: 52, height: 52, borderRadius: '50%',
-                                    background: 'rgba(255,255,255,0.92)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+                                    position: 'absolute', top: 10, left: 10, zIndex: 2,
+                                    background: mediaBadge.color, color: '#fff',
+                                    fontSize: 10, fontWeight: 700, letterSpacing: '0.5px',
+                                    padding: '3px 8px', borderRadius: 4,
                                   }}>
-                                    <Eye size={22} style={{ color: '#000' }} />
+                                    {mediaBadge.label}
                                   </div>
-                                  <span style={{ fontSize: 11, color: '#fff', fontWeight: 600, textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                                    Clique para assistir
-                                  </span>
-                                </div>
-                              )}
-                              {!embedUrl && (
-                                <div style={{
-                                  position: 'absolute', inset: 0,
-                                  display: 'flex', flexDirection: 'column',
-                                  alignItems: 'center', justifyContent: 'center', gap: 12,
-                                  background: 'var(--bg-surface)',
-                                }}>
-                                  <Video size={28} style={{ color: 'var(--text-tertiary)' }} />
-                                  <a href={post.permalink} target="_blank" rel="noopener noreferrer"
-                                    className="btn btn-secondary btn-sm"
-                                    onClick={e => e.stopPropagation()}>
-                                    <ExternalLink size={13} /> Ver no Instagram
-                                  </a>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
+                                )}
+                                {post.thumbnail_url && (
+                                  <img
+                                    src={post.thumbnail_url}
+                                    alt=""
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
+                                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                )}
+                                {/* Play button overlay */}
+                                {embedUrl && (
+                                  <div style={{
+                                    position: 'absolute', inset: 0,
+                                    display: 'flex', flexDirection: 'column',
+                                    alignItems: 'center', justifyContent: 'center', gap: 8,
+                                  }}>
+                                    <div style={{
+                                      width: 52, height: 52, borderRadius: '50%',
+                                      background: 'rgba(255,255,255,0.92)',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+                                    }}>
+                                      <Eye size={22} style={{ color: '#000' }} />
+                                    </div>
+                                    <span style={{ fontSize: 11, color: '#fff', fontWeight: 600, textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                                      Clique para assistir
+                                    </span>
+                                  </div>
+                                )}
+                                {!embedUrl && (
+                                  <div style={{
+                                    position: 'absolute', inset: 0,
+                                    display: 'flex', flexDirection: 'column',
+                                    alignItems: 'center', justifyContent: 'center', gap: 12,
+                                    background: 'var(--bg-surface)',
+                                  }}>
+                                    <Video size={28} style={{ color: 'var(--text-tertiary)' }} />
+                                    <a href={post.permalink} target="_blank" rel="noopener noreferrer"
+                                      className="btn btn-secondary btn-sm"
+                                      onClick={e => e.stopPropagation()}>
+                                      <ExternalLink size={13} /> Ver no Instagram
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
 
-                        <div className="card-body" style={{ padding: 14 }}>
-                          {/* Metrics row */}
-                          <div style={{ display: 'flex', gap: 12, marginBottom: 10, alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-secondary)' }}>
-                              <Heart size={14} style={{ color: 'var(--brand-pink)' }} />
-                              {post.like_count?.toLocaleString() || 0}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-secondary)' }}>
-                              <MessageCircle size={14} style={{ color: 'var(--brand-purple)' }} />
-                              {post.comments_count?.toLocaleString() || 0}
-                            </div>
-                            {post.video_view_count != null && (
+                          <div className="card-body" style={{ padding: 14 }}>
+                            {/* Metrics row */}
+                            <div style={{ display: 'flex', gap: 12, marginBottom: 10, alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-secondary)' }}>
-                                <Eye size={14} style={{ color: 'var(--brand-violet)' }} />
-                                {post.video_view_count.toLocaleString()}
+                                <Heart size={14} style={{ color: 'var(--brand-pink)' }} />
+                                {post.like_count?.toLocaleString() || 0}
                               </div>
-                            )}
-                            {post.posted_at && (
-                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                                {formatDate(post.posted_at)}
-                              </span>
-                            )}
-                            {/* Badge de fonte de transcrição */}
-                            {post.transcript_source === 'whisper' ? (
-                              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--success)', background: 'var(--success-bg)', padding: '2px 6px', borderRadius: 4 }}>🎙 Whisper</span>
-                            ) : post.transcript_source === 'caption' ? (
-                              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--bg-surface)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-light)' }}>📝 Legenda</span>
-                            ) : null}
-                            {perfBadge && (
-                              <span className={`badge ${perfBadge.className}`} style={{ marginLeft: 'auto' }}>
-                                {perfBadge.label}
-                              </span>
-                            )}
-                          </div>
-
-
-
-                          {/* Transcript — só aparece quando transcrito via vídeo */}
-                          {post.transcript_source === 'whisper' && post.transcript && (
-                            <div style={{
-                              background: 'var(--success-bg)',
-                              border: '1px solid var(--success)',
-                              borderRadius: 'var(--radius-sm)',
-                              padding: 12, marginBottom: 12, fontSize: 12,
-                            }}>
-                              <div style={{ fontWeight: 600, color: 'var(--success)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <Mic size={12} />
-                                Roteiro transcrito
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-secondary)' }}>
+                                <MessageCircle size={14} style={{ color: 'var(--brand-purple)' }} />
+                                {post.comments_count?.toLocaleString() || 0}
                               </div>
-                              <p style={{ color: 'var(--text-primary)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
-                                {post.transcript}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Analysis Results */}
-                          {post.is_analyzed && post.analysis ? (
-                            <div style={{
-                              background: '#F9FAFB', border: '1px solid var(--border-light)',
-                              borderRadius: 'var(--radius-sm)', padding: 12, marginBottom: 12,
-                              fontSize: 12, display: 'flex', flexDirection: 'column', gap: 10
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontWeight: 600, color: 'var(--brand-purple)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <Sparkles size={12} />
-                                  {post.transcript_source === 'whisper' ? 'Análise Gemini 2.5' : 'Análise da Legenda'}
+                              {post.video_view_count != null && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-secondary)' }}>
+                                  <Eye size={14} style={{ color: 'var(--brand-violet)' }} />
+                                  {post.video_view_count.toLocaleString()}
+                                </div>
+                              )}
+                              {post.posted_at && (
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                  {formatDate(post.posted_at)}
                                 </span>
-                                <span className="badge badge-info" style={{ fontSize: 10 }}>{post.analysis.funnel_stage}</span>
+                              )}
+                              {/* Badge de fonte de transcrição */}
+                              {post.transcript_source === 'whisper' && (
+                                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--success)', background: 'var(--success-bg)', padding: '2px 6px', borderRadius: 4 }}>🎙 Whisper</span>
+                              )}
+                              {perfBadge && (
+                                <span className={`badge ${perfBadge.className}`} style={{ marginLeft: 'auto' }}>
+                                  {perfBadge.label}
+                                </span>
+                              )}
+                            </div>
+
+
+
+                            {/* Transcript — só aparece quando transcrito via vídeo */}
+                            {post.transcript_source === 'whisper' && post.transcript && (
+                              <div style={{
+                                background: 'var(--success-bg)',
+                                border: '1px solid var(--success)',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: 12, marginBottom: 12, fontSize: 12,
+                              }}>
+                                <div style={{ fontWeight: 600, color: 'var(--success)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <Mic size={12} />
+                                  Roteiro transcrito
+                                </div>
+                                <p style={{ color: 'var(--text-primary)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                                  {post.transcript}
+                                </p>
                               </div>
+                            )}
 
-                              {post.caption && (
-                                <div>
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Legenda Completa</span>
-                                  <div className="custom-scrollbar" style={{
-                                    fontSize: 12, color: 'var(--text-primary)',
-                                    lineHeight: 1.5, marginTop: 4,
-                                    maxHeight: 120, overflowY: 'auto',
-                                    whiteSpace: 'pre-wrap', paddingRight: 4,
-                                    background: 'var(--bg-elevated)', border: '1px solid var(--border-light)',
-                                    borderRadius: 'var(--radius-sm)', padding: 8
-                                  }}>
-                                    {post.caption}
+                            {/* Analysis Results */}
+                            {post.is_analyzed && post.analysis ? (
+                              <div style={{
+                                background: '#F9FAFB', border: '1px solid var(--border-light)',
+                                borderRadius: 'var(--radius-sm)', padding: 12, marginBottom: 12,
+                                fontSize: 12, display: 'flex', flexDirection: 'column', gap: 10
+                              }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--brand-purple)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <Sparkles size={12} />
+                                    {post.transcript_source === 'whisper' ? 'Análise Gemini 2.5' : 'Análise da Legenda'}
+                                  </span>
+                                  <span className="badge badge-info" style={{ fontSize: 10 }}>{post.analysis.funnel_stage}</span>
+                                </div>
+
+                                {post.caption && (
+                                  <div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Legenda Completa</span>
+                                    <div className="custom-scrollbar" style={{
+                                      fontSize: 12, color: 'var(--text-primary)',
+                                      lineHeight: 1.5, marginTop: 4,
+                                      maxHeight: 120, overflowY: 'auto',
+                                      whiteSpace: 'pre-wrap', paddingRight: 4,
+                                      background: 'var(--bg-elevated)', border: '1px solid var(--border-light)',
+                                      borderRadius: 'var(--radius-sm)', padding: 8
+                                    }}>
+                                      {post.caption}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
 
-                              {/* Headline só aparece quando a IA teve acesso ao vídeo real */}
-                              {post.transcript_source === 'whisper' && post.analysis.headline && (
-                                <div>
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Headline / Promessa</span>
-                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.headline}</div>
-                                </div>
-                              )}
-
-                              {/* Gancho só aparece com transcrição real (da thumbnail/voz, não da legenda) */}
-                              {post.transcript_source === 'whisper' && post.analysis.hook?.text && (
-                                <div>
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Gancho ({post.analysis.hook?.technique})</span>
-                                  <div style={{ fontStyle: 'italic', borderLeft: '2px solid var(--brand-pink)', paddingLeft: 8, marginTop: 4, color: 'var(--text-secondary)' }}>
-                                    "{post.analysis.hook?.text}"
+                                {/* Headline só aparece quando a IA teve acesso ao vídeo real */}
+                                {post.transcript_source === 'whisper' && post.analysis.headline && (
+                                  <div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Headline / Promessa</span>
+                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.headline}</div>
                                   </div>
-                                </div>
-                              )}
-                              
-                              {post.analysis.cta?.text && (
-                                <div>
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Chamada para Ação ({post.analysis.cta?.type})</span>
-                                  <div style={{ color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.cta?.text}</div>
-                                </div>
-                              )}
+                                )}
 
-                              {/* Estrutura do corpo */}
-                              {post.analysis.body_structure && (Array.isArray(post.analysis.body_structure) ? post.analysis.body_structure.length > 0 : post.analysis.body_structure) && (
-                                <div>
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Estrutura do Conteúdo</span>
-                                  <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    {Array.isArray(post.analysis.body_structure)
-                                      ? post.analysis.body_structure.map((step, i) => (
+                                {/* Gancho só aparece com transcrição real (da thumbnail/voz, não da legenda) */}
+                                {post.transcript_source === 'whisper' && post.analysis.hook?.text && (
+                                  <div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Gancho ({post.analysis.hook?.technique})</span>
+                                    <div style={{ fontStyle: 'italic', borderLeft: '2px solid var(--brand-pink)', paddingLeft: 8, marginTop: 4, color: 'var(--text-secondary)' }}>
+                                      "{post.analysis.hook?.text}"
+                                    </div>
+                                  </div>
+                                )}
+
+                                {post.analysis.cta?.text && (
+                                  <div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Chamada para Ação ({post.analysis.cta?.type})</span>
+                                    <div style={{ color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.cta?.text}</div>
+                                  </div>
+                                )}
+
+                                {/* Estrutura do corpo */}
+                                {post.analysis.body_structure && (Array.isArray(post.analysis.body_structure) ? post.analysis.body_structure.length > 0 : post.analysis.body_structure) && (
+                                  <div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Estrutura do Conteúdo</span>
+                                    <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                      {Array.isArray(post.analysis.body_structure)
+                                        ? post.analysis.body_structure.map((step, i) => (
                                           <div key={i} style={{ fontSize: 11, color: 'var(--text-primary)', display: 'flex', gap: 6 }}>
                                             <span style={{ color: 'var(--brand-purple)', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
                                             <span>{step}</span>
                                           </div>
                                         ))
-                                      : <div style={{ fontSize: 11, color: 'var(--text-primary)' }}>{post.analysis.body_structure as string}</div>
-                                    }
+                                        : <div style={{ fontSize: 11, color: 'var(--text-primary)' }}>{post.analysis.body_structure as string}</div>
+                                      }
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-
-                              {/* Tema principal */}
-                              {post.analysis.main_theme && (
-                                <div>
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Tema Principal</span>
-                                  <div style={{ fontSize: 11, color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.main_theme}</div>
-                                </div>
-                              )}
-
-                              {/* Aviso quando análise foi feita só por legenda */}
-                              {post.transcript_source !== 'whisper' && (
-                                <div style={{
-                                  display: 'flex', alignItems: 'center', gap: 6,
-                                  padding: '6px 8px',
-                                  background: 'var(--warning-bg)',
-                                  borderRadius: 'var(--radius-sm)',
-                                  fontSize: 11, color: 'var(--warning)',
-                                }}>
-                                  <Mic size={11} />
-                                  Transcreva o vídeo para ver headline e gancho reais
-                                </div>
-                              )}
-                            </div>
-                          ) : null}
-
-                          {/* Actions */}
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            {post.media_type !== 'IMAGE' && (
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => transcribePost(post.id)}
-                                disabled={analyzingPostId === post.id}
-                                title="Selecione o arquivo MP4 do vídeo para transcrever com Whisper"
-                                style={{ flex: 1 }}
-                              >
-                                {analyzingPostId === post.id ? (
-                                  <div className="spinner" style={{ width: 14, height: 14 }} />
-                                ) : (
-                                  <>
-                                    <Mic size={14} />
-                                    {post.transcript_source === 'whisper' ? 'Re-transcrever' : 'Transcrever'}
-                                  </>
                                 )}
+
+                                {/* Tema principal */}
+                                {post.analysis.main_theme && (
+                                  <div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'uppercase', fontWeight: 600 }}>Tema Principal</span>
+                                    <div style={{ fontSize: 11, color: 'var(--text-primary)', marginTop: 2 }}>{post.analysis.main_theme}</div>
+                                  </div>
+                                )}
+
+                                {/* Aviso quando análise foi feita só por legenda */}
+                                {post.transcript_source !== 'whisper' && (
+                                  <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    padding: '6px 8px',
+                                    background: 'var(--warning-bg)',
+                                    borderRadius: 'var(--radius-sm)',
+                                    fontSize: 11, color: 'var(--warning)',
+                                  }}>
+                                    <Mic size={11} />
+                                    Transcreva o vídeo para ver headline e gancho reais
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
+
+                            {/* Actions */}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              {post.media_type !== 'IMAGE' && (
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => transcribePost(post.id)}
+                                  disabled={analyzingPostId === post.id}
+                                  title="Selecione o arquivo MP4 do vídeo para transcrever com Whisper"
+                                  style={{ flex: 1 }}
+                                >
+                                  {analyzingPostId === post.id ? (
+                                    <div className="spinner" style={{ width: 14, height: 14 }} />
+                                  ) : (
+                                    <>
+                                      <Mic size={14} />
+                                      {post.transcript_source === 'whisper' ? 'Re-transcrever' : 'Transcrever'}
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                              <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => handleSendToPipeline(post)}
+                                title="Adicionar ao Banco de Ideias no funil"
+                              >
+                                <Plus size={14} />
+                                Banco de Ideias
                               </button>
-                            )}
-                            <button
-                              className="btn btn-primary btn-sm"
-                              onClick={() => handleSendToPipeline(post)}
-                              title="Adicionar ao Banco de Ideias no funil"
-                            >
-                              <Plus size={14} />
-                              Banco de Ideias
-                            </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
 
               {(visibleCount < savedPosts.length || (nextCursor && selectedProfile?.id === savedProfile?.id)) && (

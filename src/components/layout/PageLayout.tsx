@@ -7,9 +7,10 @@ interface PageLayoutProps {
   subtitle?: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
+  fullWidth?: boolean;
 }
 
-export function PageLayout({ title, subtitle, children, actions }: PageLayoutProps) {
+export function PageLayout({ title, subtitle, children, actions, fullWidth }: PageLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -54,7 +55,7 @@ export function PageLayout({ title, subtitle, children, actions }: PageLayoutPro
             </div>
           )}
         </div>
-        <div className="page-content">
+        <div className="page-content" style={fullWidth ? { maxWidth: '100%' } : undefined}>
           {children}
         </div>
       </div>
