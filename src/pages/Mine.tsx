@@ -79,6 +79,8 @@ export function MinePage() {
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [activeEmbedId, setActiveEmbedId] = useState<string | null>(null);
   const [profileToDelete, setProfileToDelete] = useState<MinedProfile | null>(null);
+  const [visibleCount, setVisibleCount] = useState(9);
+  const [sortBy, setSortBy] = useState<'recent' | 'likes' | 'comments' | 'views'>('recent');
 
   const getShortcode = (permalink: string) => {
     const m = permalink.match(/instagram\.com\/(?:p|reel|tv)\/([^/?]+)/);
@@ -117,6 +119,7 @@ export function MinePage() {
 
   const handleSelectProfile = async (profile: MinedProfile) => {
     setSelectedProfile(profile);
+    setVisibleCount(9);
     await loadProfilePosts(profile.id);
   };
 
@@ -208,28 +211,20 @@ export function MinePage() {
               )}
             </button>
           </div>
-          <div style={{
-            padding: '8px 20px 12px',
-            display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 12, color: 'var(--text-tertiary)',
-          }}>
-            <AlertTriangle size={12} />
-            Para minerar perfis de terceiros, a Meta exige Instagram Graph API com Facebook Login e uma Pagina conectada.
-          </div>
         </div>
       </form>
 
       <div className="mine-layout-grid" style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
         {/* Saved profiles list */}
-        <div className="card">
-          <div className="card-header">
+        <div className="card" style={{ position: 'sticky', top: 24, maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column' }}>
+          <div className="card-header" style={{ flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Users size={16} style={{ color: 'var(--brand-purple)' }} />
               <span style={{ fontSize: 14, fontWeight: 600 }}>Perfis Salvos</span>
             </div>
             <span className="badge badge-info">{savedProfiles.length}</span>
           </div>
-          <div style={{ padding: 8 }}>
+          <div className="custom-scrollbar" style={{ padding: 8, overflowY: 'auto', flex: 1 }}>
             {loadingProfiles ? (
               <div style={{ padding: 24, textAlign: 'center' }}>
                 <div className="spinner-gradient" style={{ margin: '0 auto' }} />
@@ -331,17 +326,41 @@ export function MinePage() {
                   <div className="empty-state">
                     <Eye size={40} />
                     <h3>Nenhum post minerado</h3>
-                    <p>Os posts aparecerao aqui quando o Business Discovery estiver configurado via Facebook Login.</p>
+                    <p>Mineração os posts deste perfil aparecerão aqui.</p>
                   </div>
                 </div>
               ) : (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                  gap: 16,
-                }}>
-                  {savedPosts.map(post => {
-                    const perfBadge = getPerformanceBadge(post.performance_ratio);
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 16, margin: 0 }}>Posts Minerados</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Ordenar por:</label>
+                      <select 
+                        className="input" 
+                        style={{ height: 36, padding: '0 12px', minWidth: 140 }}
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as any)}
+                      >
+                        <option value="recent">Mais recentes</option>
+                        <option value="likes">Mais curtidas</option>
+                        <option value="comments">Mais comentários</option>
+                        <option value="views">Mais visualizações (vídeos)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                    gap: 16,
+                  }}>
+                    {[...savedPosts].sort((a, b) => {
+                      if (sortBy === 'likes') return (b.like_count || 0) - (a.like_count || 0);
+                      if (sortBy === 'comments') return (b.comments_count || 0) - (a.comments_count || 0);
+                      if (sortBy === 'views') return (b.video_view_count || 0) - (a.video_view_count || 0);
+                      return new Date(b.posted_at || 0).getTime() - new Date(a.posted_at || 0).getTime();
+                    }).slice(0, visibleCount).map(post => {
+                      const perfBadge = getPerformanceBadge(post.performance_ratio);
                     return (
                       <div key={post.id} className="card animate-slide-up">
                         {/* Embed / Thumbnail */}
@@ -442,6 +461,12 @@ export function MinePage() {
                               <MessageCircle size={14} style={{ color: 'var(--brand-purple)' }} />
                               {post.comments_count?.toLocaleString() || 0}
                             </div>
+                            {post.video_view_count != null && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-secondary)' }}>
+                                <Eye size={14} style={{ color: 'var(--brand-violet)' }} />
+                                {post.video_view_count.toLocaleString()}
+                              </div>
+                            )}
                             {post.posted_at && (
                               <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
                                 {formatDate(post.posted_at)}
@@ -614,18 +639,24 @@ export function MinePage() {
                 </div>
               )}
 
-              {nextCursor && selectedProfile?.id === savedProfile?.id && (
+              {(visibleCount < savedPosts.length || (nextCursor && selectedProfile?.id === savedProfile?.id)) && (
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 24 }}>
                   <button
                     className="btn btn-secondary"
-                    onClick={loadMorePosts}
+                    onClick={() => {
+                      if (visibleCount < savedPosts.length) {
+                        setVisibleCount(v => v + 9);
+                      } else {
+                        loadMorePosts();
+                      }
+                    }}
                     disabled={postsLoading}
                     style={{ minWidth: 200 }}
                   >
                     {postsLoading ? (
                       <div className="spinner" style={{ width: 16, height: 16 }} />
                     ) : (
-                      'Carregar mais posts'
+                      `Ver mais (${Math.min(9, savedPosts.length - visibleCount) || ''} posts)`
                     )}
                   </button>
                 </div>
