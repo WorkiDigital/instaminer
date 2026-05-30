@@ -57,7 +57,7 @@ export function Sidebar({ mobileOpen, onCloseMobile, collapsed, onToggleCollapse
           <div className="sidebar-logo">
             <Pickaxe size={20} color="#fff" />
           </div>
-          <span className="sidebar-brand">ContentMiner</span>
+          <span className="sidebar-brand">Instaminer</span>
           <button
             className="btn-icon"
             onClick={onCloseMobile}

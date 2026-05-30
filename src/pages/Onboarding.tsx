@@ -69,7 +69,7 @@ export function OnboardingPage() {
                 <Pickaxe size={28} color="#fff" />
               </div>
               <h2 style={{ marginBottom: 8 }}>
-                Bem-vindo ao <span className="text-gradient">ContentMiner</span>
+                Bem-vindo ao <span className="text-gradient">Instaminer</span>
               </h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
                 {profile?.full_name ? `Olá, ${profile.full_name}! ` : ''}
