@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
 
     // timeout=90s — Apify tem até 90 segundos para responder
     const apifyReq = await fetch(
-      `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=90`,
+      `https://api.apify.com/v2/acts/apify~instagram-api-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=90`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

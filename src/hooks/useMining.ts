@@ -16,14 +16,24 @@ interface BusinessDiscoveryResult {
   media: Array<{
     id: string;
     caption?: string;
-    like_count?: number;
+    like_count?: number | null;
     comments_count?: number;
     media_type?: string;
     media_product_type?: string;
     permalink: string;
     timestamp?: string;
     thumbnail_url?: string;
+    video_url?: string;
+    video_view_count?: number | null;
+    video_play_count?: number | null;
+    shortcode?: string;
   }>;
+  paging?: {
+    cursors?: {
+      after?: string;
+      before?: string;
+    };
+  } | null;
 }
 
 interface BusinessDiscoveryError {
@@ -62,6 +72,7 @@ export function useMining() {
   const [savedProfile, setSavedProfile] = useState<MinedProfile | null>(null);
   const [savedPosts, setSavedPosts] = useState<MinedPost[]>([]);
   const [analyzingPostId, setAnalyzingPostId] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const saveProfile = useCallback(async (profileData: BusinessDiscoveryResult) => {
     if (!user) return null;
@@ -106,10 +117,12 @@ export function useMining() {
           media_type: m.media_type || null,
           media_product_type: m.media_product_type || null,
           caption: m.caption || null,
-          like_count: m.like_count || 0,
+          like_count: m.like_count ?? 0,
           comments_count: m.comments_count || 0,
+          video_view_count: m.video_view_count ?? null,
           posted_at: m.timestamp || null,
           thumbnail_url: m.thumbnail_url || null,
+          video_url: m.video_url || null,
           performance_ratio: avgLikes > 0 ? (m.like_count || 0) / avgLikes : null,
           transcript_source: m.caption ? 'caption' : 'none',
           transcript: m.caption || null,
@@ -175,6 +188,12 @@ export function useMining() {
         return;
       }
 
+      if (data.paging?.cursors?.after) {
+        setNextCursor(data.paging.cursors.after);
+      } else {
+        setNextCursor(null);
+      }
+
       setProfileResult(data);
       await saveProfile(data);
     } catch (err) {
@@ -201,6 +220,109 @@ export function useMining() {
       return [];
     }
   }, [user]);
+
+  const loadMorePosts = useCallback(async () => {
+    if (!user || !savedProfile || !nextCursor) return;
+    setPostsLoading(true);
+
+    try {
+      const { data: connection } = await supabase
+        .from('instagram_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!connection) {
+        toast.error('Conecte sua conta Instagram primeiro em Configurações');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke<
+        BusinessDiscoveryResult | BusinessDiscoveryError
+      >('instagram-business-discovery', {
+        body: { username: savedProfile.ig_username, after: nextCursor },
+      });
+
+      if (error) {
+        console.error('Business Discovery function error:', error);
+        toast.error(await getFunctionErrorMessage(error));
+        return;
+      }
+
+      if (!data) {
+        toast.error('A API nao retornou dados do perfil');
+        return;
+      }
+
+      if (isBusinessDiscoveryError(data)) {
+        console.error('Business Discovery API error:', data);
+        toast.error(data.error || 'Erro ao carregar mais posts');
+        return;
+      }
+
+      if (data.paging?.cursors?.after) {
+        setNextCursor(data.paging.cursors.after);
+      } else {
+        setNextCursor(null);
+      }
+
+      if (data.media.length > 0) {
+        const avgLikes = savedProfile.avg_likes || 1;
+
+        const newPosts = data.media.map(m => {
+          const analysis = m.caption ? extractAnalysisFromCaption(m.caption) : null;
+          return {
+            mined_profile_id: savedProfile.id,
+            ig_media_id: m.id,
+            permalink: m.permalink,
+            media_type: m.media_type || null,
+            media_product_type: m.media_product_type || null,
+            caption: m.caption || null,
+            like_count: m.like_count ?? 0,
+            comments_count: m.comments_count || 0,
+            video_view_count: m.video_view_count ?? null,
+            video_play_count: m.video_play_count ?? null,
+            posted_at: m.timestamp || null,
+            thumbnail_url: m.thumbnail_url || null,
+            video_url: m.video_url || null,
+            performance_ratio: avgLikes > 0 ? (m.like_count || 0) / avgLikes : null,
+            transcript_source: m.caption ? 'caption' : 'none',
+            transcript: m.caption || null,
+            analysis: analysis,
+            is_analyzed: !!analysis,
+          };
+        });
+
+        const { data: savedPostsData, error: postsError } = await supabase
+          .from('mined_posts')
+          .insert(newPosts)
+          .select();
+
+        if (postsError) {
+          console.error(postsError);
+          toast.error('Erro ao salvar novos posts');
+        } else if (savedPostsData) {
+          // Sort the combined list by posted_at descending
+          setSavedPosts(prev => {
+            const combined = [...prev, ...savedPostsData];
+            return combined.sort((a, b) => {
+              const dateA = a.posted_at ? new Date(a.posted_at).getTime() : 0;
+              const dateB = b.posted_at ? new Date(b.posted_at).getTime() : 0;
+              return dateB - dateA;
+            });
+          });
+        }
+      }
+
+      toast.success('Mais posts carregados!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao carregar mais posts');
+    } finally {
+      setPostsLoading(false);
+    }
+  }, [user, savedProfile, nextCursor]);
 
   const loadProfilePosts = useCallback(async (profileId: string) => {
     setPostsLoading(true);
@@ -347,6 +469,8 @@ export function useMining() {
     saveProfile,
     loadSavedProfiles,
     loadProfilePosts,
+    loadMorePosts,
+    nextCursor,
     analyzePost,
     transcribePost,
     deleteProfile,

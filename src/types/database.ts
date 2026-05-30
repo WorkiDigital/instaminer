@@ -144,6 +144,9 @@ export interface Database {
           comments_count: number | null;
           posted_at: string | null;
           thumbnail_url: string | null;
+          video_url: string | null;
+          video_view_count: number | null;
+          video_play_count: number | null;
           transcript: string | null;
           transcript_source: string | null;
           analysis: PostAnalysis | null;
@@ -163,6 +166,9 @@ export interface Database {
           comments_count?: number | null;
           posted_at?: string | null;
           thumbnail_url?: string | null;
+          video_url?: string | null;
+          video_view_count?: number | null;
+          video_play_count?: number | null;
           transcript?: string | null;
           transcript_source?: string | null;
           analysis?: PostAnalysis | null;
@@ -178,6 +184,9 @@ export interface Database {
           like_count?: number | null;
           comments_count?: number | null;
           thumbnail_url?: string | null;
+          video_url?: string | null;
+          video_view_count?: number | null;
+          video_play_count?: number | null;
         };
         Relationships: [];
       };
