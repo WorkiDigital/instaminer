@@ -61,31 +61,38 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) return json({ error: "Invalid user session" }, 401);
 
-  // Chama Apify instagram-api-scraper (run-sync-get-dataset-items = síncrono, aguarda o resultado)
   const profileUrl = `https://www.instagram.com/${cleanUsername}/`;
 
-  const apifyRes = await fetch(
-    `https://api.apify.com/v2/acts/apify~instagram-api-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=90`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        directUrls: [profileUrl],
-        resultsType: "posts",
-        resultsLimit,
-      }),
-      signal: AbortSignal.timeout(100_000),
-    }
-  );
+  // Chama posts e detalhes do perfil em paralelo
+  const [postsRes, detailsRes] = await Promise.all([
+    fetch(
+      `https://api.apify.com/v2/acts/apify~instagram-api-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=90`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directUrls: [profileUrl], resultsType: "posts", resultsLimit }),
+        signal: AbortSignal.timeout(100_000),
+      }
+    ),
+    fetch(
+      `https://api.apify.com/v2/acts/apify~instagram-api-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=60`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directUrls: [profileUrl], resultsType: "details", resultsLimit: 1 }),
+        signal: AbortSignal.timeout(70_000),
+      }
+    ),
+  ]);
 
-  if (!apifyRes.ok) {
-    const errText = await apifyRes.text().catch(() => "");
-    console.error("Apify HTTP error", apifyRes.status, errText);
-    return json({ error: `Apify retornou erro ${apifyRes.status}. ${errText.substring(0, 200)}` }, 500);
+  if (!postsRes.ok) {
+    const errText = await postsRes.text().catch(() => "");
+    console.error("Apify posts HTTP error", postsRes.status, errText);
+    return json({ error: `Apify retornou erro ${postsRes.status}. ${errText.substring(0, 200)}` }, 500);
   }
 
-  const items: Record<string, unknown>[] = await apifyRes.json();
-  console.log("Apify items count:", items?.length, "first item error:", (items?.[0] as Record<string, unknown>)?.error);
+  const items: Record<string, unknown>[] = await postsRes.json();
+  console.log("Apify items count:", items?.length);
 
   if (!items || items.length === 0) {
     return json({ error: "Apify não retornou dados. O perfil pode ser privado ou não existir." }, 400);
@@ -95,14 +102,22 @@ Deno.serve(async (req) => {
     return json({ error: "Erro do Apify: " + ((items[0] as Record<string, unknown>).errorDescription || (items[0] as Record<string, unknown>).error) }, 400);
   }
 
-  // Todos os itens têm ownerUsername — pega dados do perfil do primeiro
+  // Tenta pegar detalhes do perfil (followers, foto)
+  let profileDetails: Record<string, unknown> = {};
+  if (detailsRes.ok) {
+    const detailsData = await detailsRes.json().catch(() => []);
+    if (Array.isArray(detailsData) && detailsData.length > 0 && !detailsData[0].error) {
+      profileDetails = detailsData[0] as Record<string, unknown>;
+    }
+  }
+
   const first = items[0] as Record<string, unknown>;
   const profile = {
-    username: String(first.ownerUsername || cleanUsername),
-    name: String(first.ownerFullName || first.ownerUsername || cleanUsername),
-    followers_count: 0, // Apify posts não retorna followers — só via profileType
-    media_count: items.length,
-    profile_picture_url: "",
+    username: String(profileDetails.username || first.ownerUsername || cleanUsername),
+    name: String(profileDetails.fullName || profileDetails.name || first.ownerFullName || first.ownerUsername || cleanUsername),
+    followers_count: Number(profileDetails.followersCount || 0),
+    media_count: Number(profileDetails.postsCount || items.length),
+    profile_picture_url: String(profileDetails.profilePicUrl || profileDetails.profilePicUrlHD || ""),
   };
 
   // Mapeia posts para o formato que o frontend espera

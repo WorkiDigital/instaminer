@@ -97,8 +97,6 @@ export function useMining() {
       return null;
     }
 
-    setSavedProfile(profile);
-
     if (profileData.media.length > 0 && profile) {
       const avgLikes = profileData.media.reduce((sum, m) => sum + (m.like_count || 0), 0) / profileData.media.length;
       const avgComments = profileData.media.reduce((sum, m) => sum + (m.comments_count || 0), 0) / profileData.media.length;
@@ -107,6 +105,9 @@ export function useMining() {
         .from('mined_profiles')
         .update({ avg_likes: avgLikes, avg_comments: avgComments })
         .eq('id', profile.id);
+
+      // Atualiza o estado com os valores calculados
+      setSavedProfile({ ...profile, avg_likes: avgLikes, avg_comments: avgComments });
 
       const posts = profileData.media.map(m => {
         const analysis = m.caption ? extractAnalysisFromCaption(m.caption) : null;
@@ -141,6 +142,8 @@ export function useMining() {
       }
 
       setSavedPosts(savedPostsData || []);
+    } else {
+      setSavedProfile(profile);
     }
 
     toast.success('Perfil salvo com sucesso!');

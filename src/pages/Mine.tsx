@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { useMining } from '../hooks/useMining';
 import { usePipeline } from '../hooks/usePipeline';
+import { proxyImgUrl } from '../lib/supabase';
 import type { MinedProfile, MinedPost } from '../types/database';
 import {
   Search, TrendingUp, Heart, MessageCircle, Eye,
@@ -12,12 +13,15 @@ import {
 export function MinePage() {
   const {
     searchLoading,
+    postsLoading,
     savedPosts,
     savedProfile,
     analyzingPostId,
     searchProfile,
     loadSavedProfiles,
     loadProfilePosts,
+    loadMorePosts,
+    nextCursor,
     transcribePost,
     deleteProfile,
   } = useMining();
@@ -125,7 +129,7 @@ export function MinePage() {
     if (!url) return fallback;
     return (
       <img
-        src={url}
+        src={proxyImgUrl(url) ?? url}
         alt={username}
         style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
         onError={e => {
@@ -388,7 +392,7 @@ export function MinePage() {
                               )}
                               {post.thumbnail_url && (
                                 <img
-                                  src={post.thumbnail_url}
+                                  src={proxyImgUrl(post.thumbnail_url) ?? post.thumbnail_url}
                                   alt=""
                                   style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -613,6 +617,23 @@ export function MinePage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {nextCursor && selectedProfile?.id === savedProfile?.id && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 24 }}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={loadMorePosts}
+                    disabled={postsLoading}
+                    style={{ minWidth: 200 }}
+                  >
+                    {postsLoading ? (
+                      <div className="spinner" style={{ width: 16, height: 16 }} />
+                    ) : (
+                      'Carregar mais posts'
+                    )}
+                  </button>
                 </div>
               )}
             </>

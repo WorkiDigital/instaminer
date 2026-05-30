@@ -15,3 +15,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
 });
+
+// Proxy para imagens do Instagram (evita bloqueio de CORS)
+export function proxyImgUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (!url.includes('cdninstagram') && !url.includes('fbcdn') && !url.includes('scontent')) return url;
+  return `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(url)}`;
+}
