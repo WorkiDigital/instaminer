@@ -16,7 +16,6 @@ function json(body: Record<string, unknown>, status = 200) {
   });
 }
 
-// Mapeia o tipo do post Apify para o padrão do banco
 function mapMediaType(item: Record<string, unknown>): string {
   const productType = String(item.productType || "").toLowerCase();
   const type = String(item.type || "").toLowerCase();
@@ -33,12 +32,65 @@ function mapMediaProductType(item: Record<string, unknown>): string {
   return "FEED";
 }
 
+// Baixa uma imagem e salva no Storage — retorna a URL pública ou null se falhar
+async function cacheImage(
+  adminClient: ReturnType<typeof createClient>,
+  supabaseUrl: string,
+  imgUrl: string,
+  storagePath: string
+): Promise<string | null> {
+  if (!imgUrl) return null;
+  try {
+    const res = await fetch(imgUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://www.instagram.com/",
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return null;
+    const bytes = await res.arrayBuffer();
+    if (bytes.byteLength < 500) return null;
+
+    const contentType = res.headers.get("content-type") || "image/jpeg";
+    const { error } = await adminClient.storage
+      .from("thumbnails")
+      .upload(storagePath, bytes, { contentType, upsert: true });
+
+    if (error) {
+      console.error("Storage upload error:", error.message);
+      return null;
+    }
+
+    const { data } = adminClient.storage.from("thumbnails").getPublicUrl(storagePath);
+    return data?.publicUrl || null;
+  } catch (err) {
+    console.error("cacheImage error:", err);
+    return null;
+  }
+}
+
+// Processa em lotes para não sobrecarregar
+async function runInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization");
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const apifyToken = Deno.env.get("APIFY_API_TOKEN");
 
@@ -63,7 +115,7 @@ Deno.serve(async (req) => {
 
   const profileUrl = `https://www.instagram.com/${cleanUsername}/`;
 
-  // Chama posts e detalhes do perfil em paralelo
+  // Busca posts e detalhes do perfil em paralelo
   const [postsRes, detailsRes] = await Promise.all([
     fetch(
       `https://api.apify.com/v2/acts/apify~instagram-api-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=90`,
@@ -87,22 +139,17 @@ Deno.serve(async (req) => {
 
   if (!postsRes.ok) {
     const errText = await postsRes.text().catch(() => "");
-    console.error("Apify posts HTTP error", postsRes.status, errText);
     return json({ error: `Apify retornou erro ${postsRes.status}. ${errText.substring(0, 200)}` }, 500);
   }
 
   const items: Record<string, unknown>[] = await postsRes.json();
-  console.log("Apify items count:", items?.length);
-
   if (!items || items.length === 0) {
     return json({ error: "Apify não retornou dados. O perfil pode ser privado ou não existir." }, 400);
   }
-
   if ((items[0] as Record<string, unknown>).error) {
     return json({ error: "Erro do Apify: " + ((items[0] as Record<string, unknown>).errorDescription || (items[0] as Record<string, unknown>).error) }, 400);
   }
 
-  // Tenta pegar detalhes do perfil (followers, foto)
   let profileDetails: Record<string, unknown> = {};
   if (detailsRes.ok) {
     const detailsData = await detailsRes.json().catch(() => []);
@@ -112,18 +159,31 @@ Deno.serve(async (req) => {
   }
 
   const first = items[0] as Record<string, unknown>;
+
+  // Cache da foto do perfil no Storage
+  const profilePicOrig = String(profileDetails.profilePicUrlHD || profileDetails.profilePicUrl || "");
+  const profilePicCached = profilePicOrig
+    ? await cacheImage(adminClient, supabaseUrl, profilePicOrig, `thumbnails/${cleanUsername}/avatar.jpg`)
+    : null;
+
   const profile = {
     username: String(profileDetails.username || first.ownerUsername || cleanUsername),
     name: String(profileDetails.fullName || profileDetails.name || first.ownerFullName || first.ownerUsername || cleanUsername),
     followers_count: Number(profileDetails.followersCount || 0),
     media_count: Number(profileDetails.postsCount || items.length),
-    profile_picture_url: String(profileDetails.profilePicUrl || profileDetails.profilePicUrlHD || ""),
+    profile_picture_url: profilePicCached || profilePicOrig,
   };
 
-  // Mapeia posts para o formato que o frontend espera
-  const media = items.map((item) => {
+  // Cache das thumbnails dos posts em lotes de 5
+  const mediaWithCachedThumbs = await runInBatches(items, 5, async (item) => {
     const it = item as Record<string, unknown>;
     const shortCode = String(it.shortCode || "");
+    const origThumb = String(it.displayUrl || "");
+
+    const cachedThumb = origThumb
+      ? await cacheImage(adminClient, supabaseUrl, origThumb, `thumbnails/${cleanUsername}/${shortCode}.jpg`)
+      : null;
+
     return {
       id: String(it.id || ""),
       shortcode: shortCode,
@@ -132,7 +192,7 @@ Deno.serve(async (req) => {
       media_product_type: mapMediaProductType(it),
       permalink: String(it.url || `https://www.instagram.com/p/${shortCode}/`),
       timestamp: String(it.timestamp || ""),
-      thumbnail_url: String(it.displayUrl || ""),
+      thumbnail_url: cachedThumb || origThumb,
       video_url: String(it.videoUrl || ""),
       like_count: typeof it.likesCount === "number" && it.likesCount >= 0 ? it.likesCount : null,
       comments_count: typeof it.commentsCount === "number" ? it.commentsCount : 0,
@@ -141,5 +201,5 @@ Deno.serve(async (req) => {
     };
   });
 
-  return json({ profile, media, paging: null });
+  return json({ profile, media: mediaWithCachedThumbs, paging: null });
 });

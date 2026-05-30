@@ -10,6 +10,30 @@ import {
   Trash2, X
 } from 'lucide-react';
 
+const ProfileAvatar = ({ url, username, size }: { url: string | null; username: string; size: number }) => {
+  const [hasError, setHasError] = useState(false);
+  const fontSize = size <= 40 ? 14 : 22;
+  const fallback = (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: 'var(--gradient-primary)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: '#fff', fontSize, fontWeight: 700, flexShrink: 0,
+    }}>
+      {username?.[0]?.toUpperCase() || '?'}
+    </div>
+  );
+  if (!url || hasError) return fallback;
+  return (
+    <img
+      src={proxyImgUrl(url) ?? url}
+      alt={username}
+      style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+      onError={() => setHasError(true)}
+    />
+  );
+};
+
 export function MinePage() {
   const {
     searchLoading,
@@ -112,36 +136,6 @@ export function MinePage() {
       }
     }
     setProfileToDelete(null);
-  };
-
-  const ProfileAvatar = ({ url, username, size }: { url: string | null; username: string; size: number }) => {
-    const fontSize = size <= 40 ? 14 : 22;
-    const fallback = (
-      <div style={{
-        width: size, height: size, borderRadius: '50%',
-        background: 'var(--gradient-primary)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#fff', fontSize, fontWeight: 700, flexShrink: 0,
-      }}>
-        {username[0].toUpperCase()}
-      </div>
-    );
-    if (!url) return fallback;
-    return (
-      <img
-        src={proxyImgUrl(url) ?? url}
-        alt={username}
-        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-        onError={e => {
-          const img = e.currentTarget;
-          img.style.display = 'none';
-          const div = document.createElement('div');
-          div.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:${fontSize}px;font-weight:700;flex-shrink:0`;
-          div.textContent = username[0].toUpperCase();
-          img.parentElement?.insertBefore(div, img);
-        }}
-      />
-    );
   };
 
   const getPerformanceBadge = (ratio: number | null) => {
@@ -392,7 +386,7 @@ export function MinePage() {
                               )}
                               {post.thumbnail_url && (
                                 <img
-                                  src={proxyImgUrl(post.thumbnail_url) ?? post.thumbnail_url}
+                                  src={post.thumbnail_url}
                                   alt=""
                                   style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }}
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
